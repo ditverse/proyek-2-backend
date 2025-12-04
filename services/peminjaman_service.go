@@ -63,7 +63,6 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 	}
 
 	peminjaman := &models.Peminjaman{
-		KodePeminjaman:   generateCode("PMJ"),
 		KodeUser:         kodeUser,
 		KodeRuangan:      req.KodeRuangan,
 		KodeKegiatan:     req.KodeKegiatan,
@@ -101,9 +100,9 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 	if petugas, err := s.UserRepo.GetByRole(models.RoleSarpras); err == nil && len(petugas) > 0 {
 		for _, u := range petugas {
 			s.NotifikasiRepo.Create(&models.Notifikasi{
-				KodeNotifikasi: generateCode("NTF"),
-				KodeUser:       u.KodeUser,
-				KodePeminjaman: &kodePeminjaman,
+				KodeNotifikasi:  generateCode("NTF"),
+				KodeUser:        u.KodeUser,
+				KodePeminjaman:  &kodePeminjaman,
 				JenisNotifikasi: models.NotifPengajuanDibuat,
 				Pesan:           "Pengajuan peminjaman baru menunggu verifikasi",
 				Status:          models.NotifikasiTerkirim,

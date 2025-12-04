@@ -86,7 +86,6 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.User, error
 	}
 
 	user := &models.User{
-		KodeUser:       generateCode("USR"),
 		Nama:           req.Nama,
 		Email:          req.Email,
 		PasswordHash:   passwordHash,
@@ -101,4 +100,3 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.User, error
 	user.PasswordHash = ""
 	return user, nil
 }
-

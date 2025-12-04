@@ -17,11 +17,11 @@ func NewPeminjamanRepository(db *sql.DB) *PeminjamanRepository {
 func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 	query := `
 		INSERT INTO peminjaman (
-			kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan,
+			kode_user, kode_ruangan, kode_kegiatan,
 			tanggal_mulai, tanggal_selesai, keperluan, status, path_surat_digital
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING created_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING kode_peminjaman, created_at
 	`
 	var kodeRuangan interface{}
 	if peminjaman.KodeRuangan != nil {
@@ -33,7 +33,6 @@ func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 	}
 	return r.DB.QueryRow(
 		query,
-		peminjaman.KodePeminjaman,
 		peminjaman.KodeUser,
 		kodeRuangan,
 		kodeKegiatan,
@@ -42,7 +41,7 @@ func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 		peminjaman.Keperluan,
 		peminjaman.Status,
 		peminjaman.PathSuratDigital,
-	).Scan(&peminjaman.CreatedAt)
+	).Scan(&peminjaman.KodePeminjaman, &peminjaman.CreatedAt)
 }
 
 func (r *PeminjamanRepository) CreatePeminjamanBarang(kodePeminjamanBarang, kodePeminjaman, kodeBarang string, jumlah int) error {
@@ -63,12 +62,12 @@ func (r *PeminjamanRepository) GetByID(kodePeminjaman string) (*models.Peminjama
 		WHERE kode_peminjaman = $1
 	`
 	var (
-		kodeRuangan sql.NullString
+		kodeRuangan  sql.NullString
 		kodeKegiatan sql.NullString
-		verifiedBy sql.NullString
-		verifiedAt sql.NullTime
-		catatan sql.NullString
-		updatedAt sql.NullTime
+		verifiedBy   sql.NullString
+		verifiedAt   sql.NullTime
+		catatan      sql.NullString
+		updatedAt    sql.NullTime
 	)
 
 	p := &models.Peminjaman{}
@@ -121,13 +120,13 @@ func (r *PeminjamanRepository) scanRows(rows *sql.Rows) ([]models.Peminjaman, er
 	var result []models.Peminjaman
 	for rows.Next() {
 		var (
-			row models.Peminjaman
-			kodeRuangan sql.NullString
+			row          models.Peminjaman
+			kodeRuangan  sql.NullString
 			kodeKegiatan sql.NullString
-			verifiedBy sql.NullString
-			verifiedAt sql.NullTime
-			catatan sql.NullString
-			updatedAt sql.NullTime
+			verifiedBy   sql.NullString
+			verifiedAt   sql.NullTime
+			catatan      sql.NullString
+			updatedAt    sql.NullTime
 		)
 		err := rows.Scan(
 			&row.KodePeminjaman,
@@ -326,8 +325,8 @@ func (r *PeminjamanRepository) GetPeminjamanBarang(kodePeminjaman string) ([]mod
 	var items []models.PeminjamanBarangDetail
 	for rows.Next() {
 		var (
-			item   models.PeminjamanBarangDetail
-			barang models.Barang
+			item        models.PeminjamanBarangDetail
+			barang      models.Barang
 			ruanganKode sql.NullString
 		)
 		err := rows.Scan(
@@ -385,5 +384,3 @@ func (r *PeminjamanRepository) UpdateSuratDigitalURL(kodePeminjaman string, path
 	_, err := r.DB.Exec(query, path, kodePeminjaman)
 	return err
 }
-
-

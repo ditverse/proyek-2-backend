@@ -15,9 +15,9 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (kode_user, nama, email, password_hash, role, organisasi_kode)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING created_at
+		INSERT INTO users (nama, email, password_hash, role, organisasi_kode)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING kode_user, created_at
 	`
 	var orgKode interface{}
 	if user.OrganisasiKode != nil {
@@ -25,13 +25,12 @@ func (r *UserRepository) Create(user *models.User) error {
 	}
 	err := r.DB.QueryRow(
 		query,
-		user.KodeUser,
 		user.Nama,
 		user.Email,
 		user.PasswordHash,
 		user.Role,
 		orgKode,
-	).Scan(&user.CreatedAt)
+	).Scan(&user.KodeUser, &user.CreatedAt)
 	return err
 }
 

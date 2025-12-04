@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	storagesvc "backend-sarpras/internal/services"
 	"backend-sarpras/models"
 	"backend-sarpras/repositories"
 )
@@ -34,9 +35,18 @@ func NewPeminjamanService(
 }
 
 func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest, kodeUser string) (*models.Peminjaman, error) {
-	if req.PathSuratDigital == "" {
-		return nil, errors.New("path surat digital wajib diisi")
+	// Backward compatibility: support both old (surat_digital_url) and new (path_surat_digital) field names
+	suratPath := req.PathSuratDigital
+	if suratPath == "" && req.SuratDigitalURL != "" {
+		suratPath = req.SuratDigitalURL // Fallback to old field name
 	}
+
+	// Path is now optional - can be uploaded later via /upload-surat endpoint
+	// Common placeholder values from frontend: "uploaded-via-form", "pending", etc.
+	isPlaceholder := suratPath == "" ||
+		suratPath == "uploaded-via-form" ||
+		suratPath == "pending" ||
+		suratPath == "temp"
 
 	tanggalMulai, err := time.Parse(time.RFC3339, req.TanggalMulai)
 	if err != nil {
@@ -70,12 +80,40 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 		TanggalSelesai:   tanggalSelesai,
 		Keperluan:        req.Keperluan,
 		Status:           models.StatusPeminjamanPending,
-		PathSuratDigital: req.PathSuratDigital,
+		PathSuratDigital: suratPath, // Use the resolved path
 	}
 
 	if err := s.PeminjamanRepo.Create(peminjaman); err != nil {
 		return nil, err
 	}
+
+	// IMPORTANT: Regenerate unique path using kode_peminjaman to prevent file overwrite
+	// Each peminjaman will have unique path: peminjaman/{kode_peminjaman}/surat.pdf
+	// This ensures files from different peminjaman don't overwrite each other
+	uniquePath := fmt.Sprintf("peminjaman/%s/surat.pdf", peminjaman.KodePeminjaman)
+
+	// Move file from old path (frontend-provided) to new unique path in storage
+	// Only if path is not a placeholder and file actually exists in storage
+	if !isPlaceholder && suratPath != uniquePath {
+		if err := storagesvc.MoveFile(suratPath, uniquePath); err != nil {
+			// File doesn't exist or move failed - this is OK
+			// User can upload later via /upload-surat endpoint
+			fmt.Printf("Info: skipping file move (file may not exist yet): %v\n", err)
+			// Set path to empty so frontend knows to upload
+			uniquePath = ""
+		}
+	} else if isPlaceholder {
+		// Placeholder path - set to empty, user must upload via /upload-surat
+		uniquePath = ""
+	}
+
+	// Update path in database with unique path (or empty if file not uploaded yet)
+	if err := s.PeminjamanRepo.UpdateSuratDigitalURL(peminjaman.KodePeminjaman, uniquePath); err != nil {
+		return nil, err
+	}
+
+	// Update local object for response
+	peminjaman.PathSuratDigital = uniquePath
 
 	for _, item := range req.Barang {
 		if err := s.PeminjamanRepo.CreatePeminjamanBarang(

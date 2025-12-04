@@ -220,8 +220,9 @@ func (h *PeminjamanHandler) UploadSurat(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"message":           "Surat berhasil diupload",
-		"surat_digital_url": objectPath,
+		"message":            "Surat berhasil diupload",
+		"path_surat_digital": objectPath, // New field name
+		"surat_digital_url":  objectPath, // Old field name (backward compatibility)
 	})
 }
 

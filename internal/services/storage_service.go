@@ -19,13 +19,15 @@ func UploadPDFToSupabase(objectPath string, fileBytes []byte) error {
 
 	url := fmt.Sprintf("%s/storage/v1/object/%s/%s", cfg.URL, cfg.Bucket, objectPath)
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(fileBytes))
+	// Use PUT instead of POST to allow upsert (create or replace)
+	req, err := http.NewRequest("PUT", url, bytes.NewReader(fileBytes))
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+cfg.ServiceKey)
 	req.Header.Set("Content-Type", "application/pdf")
+	req.Header.Set("x-upsert", "true") // Allow overwrite if file exists
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -96,4 +98,64 @@ func GenerateSignedURL(objectPath string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s%s", cfg.URL, signedPath), nil
+}
+
+// MoveFile moves a file from oldPath to newPath in Supabase Storage
+// This is done by: 1) Copy file to new location, 2) Delete old file
+func MoveFile(oldPath, newPath string) error {
+	cfg := config.GetSupabaseConfig()
+	if cfg.URL == "" || cfg.ServiceKey == "" || cfg.Bucket == "" {
+		return fmt.Errorf("supabase config incomplete")
+	}
+
+	// Step 1: Download file from old path
+	downloadURL := fmt.Sprintf("%s/storage/v1/object/%s/%s", cfg.URL, cfg.Bucket, oldPath)
+
+	req, err := http.NewRequest("GET", downloadURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create download request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.ServiceKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to download file (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Read file content
+	fileBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read file content: %w", err)
+	}
+
+	// Step 2: Upload file to new path
+	if err := UploadPDFToSupabase(newPath, fileBytes); err != nil {
+		return fmt.Errorf("failed to upload to new path: %w", err)
+	}
+
+	// Step 3: Delete old file
+	deleteURL := fmt.Sprintf("%s/storage/v1/object/%s/%s", cfg.URL, cfg.Bucket, oldPath)
+
+	delReq, err := http.NewRequest("DELETE", deleteURL, nil)
+	if err != nil {
+		// File uploaded to new path, but old file not deleted - not critical
+		return nil
+	}
+	delReq.Header.Set("Authorization", "Bearer "+cfg.ServiceKey)
+
+	delResp, err := client.Do(delReq)
+	if err != nil {
+		// File uploaded to new path, but old file not deleted - not critical
+		return nil
+	}
+	defer delResp.Body.Close()
+
+	return nil
 }

@@ -37,7 +37,8 @@ type CreatePeminjamanRequest struct {
 	TanggalMulai     string                   `json:"tanggal_mulai"` // ISO 8601
 	TanggalSelesai   string                   `json:"tanggal_selesai"`
 	Keperluan        string                   `json:"keperluan"`
-	PathSuratDigital string                   `json:"path_surat_digital"`
+	PathSuratDigital string                   `json:"path_surat_digital"` // New schema
+	SuratDigitalURL  string                   `json:"surat_digital_url"`  // Old schema (backward compatibility)
 	Barang           []CreatePeminjamanBarang `json:"barang"`
 }
 
@@ -60,4 +61,3 @@ type JadwalRuanganResponse struct {
 	Status         PeminjamanStatusEnum `json:"status"`
 	Peminjam       string               `json:"peminjam"`
 }
-

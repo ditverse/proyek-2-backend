@@ -25,6 +25,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	kehadiranRepo := repositories.NewKehadiranRepository(db)
 	notifikasiRepo := repositories.NewNotifikasiRepository(db)
 	logRepo := repositories.NewLogAktivitasRepository(db)
+	organisasiRepo := repositories.NewOrganisasiRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
@@ -61,6 +62,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	notifikasiHandler := handlers.NewNotifikasiHandler(notifikasiRepo)
 	logHandler := handlers.NewLogAktivitasHandler(logRepo)
 	infoHandler := handlers.InfoUmumHandler
+	organisasiHandler := handlers.NewOrganisasiHandler(organisasiRepo)
 
 	// Use centralized CORS middleware from middleware package
 	corsMiddleware := middleware.CORSMiddleware
@@ -82,6 +84,8 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	})
 	// Public info umum endpoint
 	mux.HandleFunc("/api/info", infoHandler)
+	// Public organisasi endpoint - for registration dropdown
+	mux.HandleFunc("/api/organisasi", organisasiHandler.GetAll)
 
 	// Protected routes - Ruangan
 	mux.Handle("/api/ruangan", corsMiddleware(http.HandlerFunc(ruanganHandler.GetAll)))

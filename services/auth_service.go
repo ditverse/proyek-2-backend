@@ -28,11 +28,11 @@ func (s *AuthService) Login(email, password string) (*models.LoginResponse, erro
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("invalid credentials")
+		return nil, errors.New("Email tidak ditemukan")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, errors.New("Password salah")
 	}
 
 	claims := jwt.MapClaims{

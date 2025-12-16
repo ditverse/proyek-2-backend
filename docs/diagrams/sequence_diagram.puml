@@ -1,0 +1,270 @@
+@startuml Sequence_Peminjaman_Sarpras
+
+' ========================================
+' KONFIGURASI TAMPILAN PROFESIONAL
+' ========================================
+skinparam backgroundColor #f8fafc
+skinparam handwritten false
+skinparam shadowing false
+skinparam responseMessageBelowArrow true
+
+skinparam sequence {
+    ArrowColor #475569
+    ArrowFontName "Segoe UI"
+    ArrowFontSize 10
+    ArrowThickness 1.5
+    
+    LifeLineBorderColor #94a3b8
+    LifeLineBackgroundColor #f1f5f9
+    
+    ParticipantBorderColor #3b82f6
+    ParticipantBackgroundColor #dbeafe
+    ParticipantFontName "Segoe UI"
+    ParticipantFontSize 11
+    ParticipantFontStyle bold
+    ParticipantPadding 20
+    
+    BoxBorderColor #64748b
+    BoxBackgroundColor #f8fafc
+    BoxFontSize 12
+    
+    DividerBorderColor #94a3b8
+    DividerBackgroundColor #e2e8f0
+    DividerFontName "Segoe UI"
+    DividerFontSize 11
+    DividerFontStyle bold
+    
+    GroupBorderColor #3b82f6
+    GroupBackgroundColor #eff6ff
+    GroupHeaderFontSize 11
+}
+
+skinparam note {
+    BackgroundColor #fef3c7
+    BorderColor #f59e0b
+    FontName "Segoe UI"
+    FontSize 9
+}
+
+' ========================================
+' JUDUL
+' ========================================
+title <size:18><b>Sequence Diagram</b></size>\n<size:12>Alur Proses Peminjaman Ruangan & Barang</size>
+
+' ========================================
+' PARTICIPANTS
+' ========================================
+box "Presentation Layer" #eff6ff
+    actor "Mahasiswa" as mhs #dbeafe
+    participant "Frontend\n(Web App)" as fe #dcfce7
+end box
+
+box "API Layer" #f0fdf4
+    participant "Handler\n(peminjaman_handler)" as handler #fef3c7
+    participant "Middleware\n(AuthMiddleware)" as mw #fecdd3
+end box
+
+box "Business Layer" #faf5ff
+    participant "Service\n(peminjaman_service)" as svc #f3e8ff
+end box
+
+box "Data Layer" #fff7ed
+    participant "Repository\n(peminjaman_repo)" as repo #fed7aa
+    database "PostgreSQL\n(Supabase)" as db #cffafe
+end box
+
+' ========================================
+' SEQUENCE: LOGIN & AUTENTIKASI
+' ========================================
+== <b>Fase 1: Autentikasi</b> ==
+
+mhs -> fe : Buka halaman peminjaman
+activate fe #dcfce7
+
+fe -> mw : GET /api/peminjaman/me\n(dengan JWT Token)
+activate mw #fecdd3
+
+mw -> mw : Validasi JWT Token
+
+alt #f0fdf4 Token Valid
+    mw --> fe : 200 OK (data user)
+else #fef2f2 Token Tidak Valid
+    mw --> fe : 401 Unauthorized
+    fe --> mhs : Redirect ke halaman login
+end
+
+deactivate mw
+
+' ========================================
+' SEQUENCE: ISI FORM PEMINJAMAN
+' ========================================
+== <b>Fase 2: Pengisian Form</b> ==
+
+mhs -> fe : Isi form peminjaman\n(ruangan, tanggal, keperluan)
+fe -> fe : Validasi input client-side
+
+mhs -> fe : Upload surat digital
+fe -> fe : Validasi file (PDF/Image)
+
+note right of fe
+  File di-upload ke
+  Supabase Storage
+end note
+
+mhs -> fe : Klik "Ajukan Peminjaman"
+
+' ========================================
+' SEQUENCE: PROSES PEMINJAMAN
+' ========================================
+== <b>Fase 3: Proses Pengajuan</b> ==
+
+fe -> handler : POST /api/peminjaman\n{kode_ruangan, tanggal_mulai,\ntanggal_selesai, keperluan, barang[]}
+activate handler #fef3c7
+
+handler -> mw : Validasi Token
+activate mw #fecdd3
+mw --> handler : User Context (kode_user, role)
+deactivate mw
+
+handler -> handler : Validasi Request Body
+
+handler -> svc : CreatePeminjaman(ctx, request)
+activate svc #f3e8ff
+
+svc -> svc : Generate kode_peminjaman\n(PMJ-YYYYMMDD-XXX)
+
+svc -> repo : GetJadwalByRuanganAndDate()
+activate repo #fed7aa
+repo -> db : SELECT * FROM peminjaman\nWHERE kode_ruangan = ?\nAND tanggal overlap
+activate db #cffafe
+db --> repo : []Peminjaman
+deactivate db
+repo --> svc : Jadwal yang bertabrakan
+deactivate repo
+
+alt #f0fdf4 Jadwal Tersedia
+    svc -> repo : Create(peminjaman)
+    activate repo #fed7aa
+    repo -> db : INSERT INTO peminjaman\n(kode, user, ruangan, ...)
+    activate db #cffafe
+    db --> repo : Inserted Row
+    deactivate db
+    repo --> svc : Peminjaman{}
+    deactivate repo
+    
+    ' Simpan detail barang
+    loop #faf5ff Untuk setiap barang
+        svc -> repo : CreatePeminjamanBarang()
+        activate repo #fed7aa
+        repo -> db : INSERT INTO peminjaman_barang
+        activate db #cffafe
+        db --> repo : OK
+        deactivate db
+        repo --> svc : OK
+        deactivate repo
+    end
+    
+    ' Kirim notifikasi
+    svc -> repo : CreateNotifikasi()\nke Staff Sarpras
+    activate repo #fed7aa
+    repo -> db : INSERT INTO notifikasi
+    activate db #cffafe
+    db --> repo : OK
+    deactivate db
+    repo --> svc : OK
+    deactivate repo
+    
+    ' Catat log
+    svc -> repo : CreateLogAktivitas()\n"PENGAJUAN_DIBUAT"
+    activate repo #fed7aa
+    repo -> db : INSERT INTO log_aktivitas
+    activate db #cffafe
+    db --> repo : OK
+    deactivate db
+    repo --> svc : OK
+    deactivate repo
+    
+    svc --> handler : Peminjaman{status: PENDING}
+    handler --> fe : 201 Created\n{message, data: peminjaman}
+    fe --> mhs : Tampilkan pesan sukses\n"Peminjaman berhasil diajukan!"
+    
+else #fef2f2 Jadwal Bentrok
+    svc --> handler : Error: Jadwal tidak tersedia
+    deactivate svc
+    handler --> fe : 400 Bad Request\n{error: "Jadwal bentrok"}
+    deactivate handler
+    fe --> mhs : Tampilkan pesan error\n"Ruangan sudah dibooking"
+end
+
+deactivate fe
+
+' ========================================
+' SEQUENCE: VERIFIKASI SARPRAS
+' ========================================
+== <b>Fase 4: Verifikasi oleh Sarpras</b> ==
+
+actor "Sarpras" as sarpras #dcfce7
+activate sarpras
+
+sarpras -> fe : Buka halaman pending
+activate fe #dcfce7
+
+fe -> handler : GET /api/peminjaman/pending
+activate handler #fef3c7
+handler -> svc : GetPendingPeminjaman()
+activate svc #f3e8ff
+svc -> repo : FindByStatus(PENDING)
+activate repo #fed7aa
+repo -> db : SELECT * FROM peminjaman\nWHERE status = 'PENDING'
+activate db #cffafe
+db --> repo : []Peminjaman
+deactivate db
+repo --> svc : []Peminjaman
+deactivate repo
+svc --> handler : []Peminjaman
+deactivate svc
+handler --> fe : 200 OK {data: []}
+deactivate handler
+
+fe --> sarpras : Tampilkan daftar pending
+
+sarpras -> fe : Review & klik "Approve"
+
+fe -> handler : POST /api/peminjaman/{id}/verifikasi\n{status: APPROVED, catatan: "OK"}
+activate handler #fef3c7
+handler -> svc : VerifikasiPeminjaman()
+activate svc #f3e8ff
+
+svc -> repo : UpdateStatus()
+activate repo #fed7aa
+repo -> db : UPDATE peminjaman\nSET status = 'APPROVED'
+activate db #cffafe
+db --> repo : OK
+deactivate db
+repo --> svc : Updated
+deactivate repo
+
+svc -> repo : CreateNotifikasi()\nke Mahasiswa
+activate repo #fed7aa
+repo -> db : INSERT INTO notifikasi
+activate db #cffafe
+db --> repo : OK
+deactivate db
+repo --> svc : OK
+deactivate repo
+
+svc --> handler : {status: APPROVED}
+deactivate svc
+handler --> fe : 200 OK
+deactivate handler
+
+fe --> sarpras : "Peminjaman disetujui"
+deactivate fe
+deactivate sarpras
+
+' ========================================
+' FOOTER
+' ========================================
+footer \n<size:10><color:#64748b>Sistem Peminjaman Sarpras - Politeknik Negeri Bandung</color></size>
+
+@enduml

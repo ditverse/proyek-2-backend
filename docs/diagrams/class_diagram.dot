@@ -1,0 +1,392 @@
+/*
+ * Class Diagram - Sistem Peminjaman Sarpras
+ * Dibuat dengan Graphviz DOT Language
+ * 
+ * Untuk menghasilkan gambar:
+ * dot -Tpng class_diagram.dot -o class_diagram.png
+ * dot -Tsvg class_diagram.dot -o class_diagram.svg
+ */
+
+digraph ClassDiagram {
+    // ========================================
+    // KONFIGURASI GLOBAL
+    // ========================================
+    graph [
+        rankdir=TB
+        splines=ortho
+        nodesep=0.6
+        ranksep=1.2
+        fontname="Segoe UI"
+        fontsize=12
+        bgcolor="#f8fafc"
+        pad=0.5
+        dpi=150
+        label=<<B><FONT POINT-SIZE="22" COLOR="#1e293b">Class Diagram</FONT></B><BR/><FONT POINT-SIZE="12" COLOR="#64748b">Sistem Peminjaman Sarana &amp; Prasarana</FONT>>
+        labelloc=t
+        labeljust=c
+    ]
+    
+    node [
+        fontname="Segoe UI"
+        fontsize=10
+        shape=none
+        margin=0
+    ]
+    
+    edge [
+        fontname="Segoe UI"
+        fontsize=9
+        color="#475569"
+    ]
+
+    // ========================================
+    // CLASS: USER
+    // ========================================
+    User [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#3b82f6" COLSPAN="2"><FONT COLOR="white"><B>User</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- kode_user</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- nama</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- email</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- password_hash</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- role</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">RoleEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- organisasi_kode</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#eff6ff">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#eff6ff">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: ORGANISASI
+    // ========================================
+    Organisasi [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#8b5cf6" COLSPAN="2"><FONT COLOR="white"><B>Organisasi</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">- kode_organisasi</TD><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">- nama</TD><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">- jenis_organisasi</TD><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">JenisOrganisasiEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">- kontak</TD><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#f5f3ff">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: RUANGAN
+    // ========================================
+    Ruangan [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#22c55e" COLSPAN="2"><FONT COLOR="white"><B>Ruangan</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">- kode_ruangan</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">- nama_ruangan</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">- lokasi</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">- kapasitas</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">int</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">- deskripsi</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdf4">string</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: BARANG
+    // ========================================
+    Barang [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#f97316" COLSPAN="2"><FONT COLOR="white"><B>Barang</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fff7ed">- kode_barang</TD><TD ALIGN="LEFT" BGCOLOR="#fff7ed">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fff7ed">- nama_barang</TD><TD ALIGN="LEFT" BGCOLOR="#fff7ed">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fff7ed">- deskripsi</TD><TD ALIGN="LEFT" BGCOLOR="#fff7ed">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fff7ed">- jumlah_total</TD><TD ALIGN="LEFT" BGCOLOR="#fff7ed">int</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fff7ed">- ruangan_kode</TD><TD ALIGN="LEFT" BGCOLOR="#fff7ed">string?</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: KEGIATAN
+    // ========================================
+    Kegiatan [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#06b6d4" COLSPAN="2"><FONT COLOR="white"><B>Kegiatan</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- kode_kegiatan</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- nama_kegiatan</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- deskripsi</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- tanggal_mulai</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">datetime</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- tanggal_selesai</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">datetime</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- organisasi_kode</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#ecfeff">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#ecfeff">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: PEMINJAMAN
+    // ========================================
+    Peminjaman [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#ef4444" COLSPAN="2"><FONT COLOR="white"><B>Peminjaman</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- kode_peminjaman</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- kode_user</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- kode_ruangan</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- kode_kegiatan</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- tanggal_mulai</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">datetime</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- tanggal_selesai</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">datetime</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- keperluan</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- status</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">PeminjamanStatusEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- path_surat_digital</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- verified_by</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- verified_at</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">datetime?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- catatan_verifikasi</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fef2f2">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#fef2f2">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: PEMINJAMAN_BARANG_DETAIL
+    // ========================================
+    PeminjamanBarang [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#ec4899" COLSPAN="2"><FONT COLOR="white"><B>PeminjamanBarang</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">- kode_peminjaman_barang</TD><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">- kode_peminjaman</TD><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">- kode_barang</TD><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">- jumlah</TD><TD ALIGN="LEFT" BGCOLOR="#fdf2f8">int</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: KEHADIRAN_PEMINJAM
+    // ========================================
+    Kehadiran [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#eab308" COLSPAN="2"><FONT COLOR="white"><B>KehadiranPeminjam</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- kode_kehadiran</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- kode_peminjaman</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- status_kehadiran</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">KehadiranStatusEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- waktu_konfirmasi</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">datetime</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- keterangan</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- diverifikasi_oleh</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#fefce8">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#fefce8">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: NOTIFIKASI
+    // ========================================
+    Notifikasi [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#14b8a6" COLSPAN="2"><FONT COLOR="white"><B>Notifikasi</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- kode_notifikasi</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- kode_user</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- kode_peminjaman</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- jenis_notifikasi</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">NotifikasiJenisEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- pesan</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- status</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">NotifikasiStatusEnum</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">- created_at</TD><TD ALIGN="LEFT" BGCOLOR="#f0fdfa">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // CLASS: LOG_AKTIVITAS
+    // ========================================
+    LogAktivitas [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#64748b" COLSPAN="2"><FONT COLOR="white"><B>LogAktivitas</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- kode_log</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- kode_user</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- kode_peminjaman</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">string?</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- aksi</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- keterangan</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">string</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">- waktu</TD><TD ALIGN="LEFT" BGCOLOR="#f1f5f9">datetime</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // ENUM: ROLE
+    // ========================================
+    RoleEnum [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#1e293b" COLSPAN="2"><FONT COLOR="white"><B>«enum» RoleEnum</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">MAHASISWA</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">SARPRAS</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">SECURITY</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // ENUM: PEMINJAMAN STATUS
+    // ========================================
+    PeminjamanStatusEnum [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#1e293b" COLSPAN="2"><FONT COLOR="white"><B>«enum» PeminjamanStatusEnum</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">PENDING</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">APPROVED</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">REJECTED</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">ONGOING</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">FINISHED</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">CANCELLED</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // ENUM: KEHADIRAN STATUS
+    // ========================================
+    KehadiranStatusEnum [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="6" BGCOLOR="#ffffff">
+            <TR><TD BGCOLOR="#1e293b" COLSPAN="2"><FONT COLOR="white"><B>«enum» KehadiranStatusEnum</B></FONT></TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">HADIR</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">TIDAK_HADIR</TD></TR>
+            <TR><TD ALIGN="LEFT" BGCOLOR="#f8fafc" COLSPAN="2">BATAL</TD></TR>
+        </TABLE>
+    >]
+
+    // ========================================
+    // RELASI ANTAR CLASS
+    // ========================================
+    
+    // User -> Organisasi (many-to-one)
+    User -> Organisasi [
+        label="  berasal dari  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        style=solid
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // User uses RoleEnum
+    User -> RoleEnum [
+        style=dashed
+        arrowhead=vee
+        label="  «uses»  "
+    ]
+
+    // Kegiatan -> Organisasi (many-to-one)
+    Kegiatan -> Organisasi [
+        label="  milik  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="1"
+    ]
+
+    // Barang -> Ruangan (many-to-one, optional)
+    Barang -> Ruangan [
+        label="  berada di  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // Peminjaman -> User (many-to-one)
+    Peminjaman -> User [
+        label="  diajukan oleh  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="1"
+    ]
+
+    // Peminjaman -> Ruangan (many-to-one, optional)
+    Peminjaman -> Ruangan [
+        label="  meminjam  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // Peminjaman -> Kegiatan (many-to-one, optional)
+    Peminjaman -> Kegiatan [
+        label="  untuk  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // Peminjaman uses PeminjamanStatusEnum
+    Peminjaman -> PeminjamanStatusEnum [
+        style=dashed
+        arrowhead=vee
+        label="  «uses»  "
+    ]
+
+    // PeminjamanBarang -> Peminjaman (many-to-one)
+    PeminjamanBarang -> Peminjaman [
+        label="  bagian dari  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="1"
+    ]
+
+    // PeminjamanBarang -> Barang (many-to-one)
+    PeminjamanBarang -> Barang [
+        label="  berisi  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="1"
+    ]
+
+    // Kehadiran -> Peminjaman (one-to-one)
+    Kehadiran -> Peminjaman [
+        label="  mencatat  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="0..1"
+        headlabel="1"
+    ]
+
+    // Kehadiran uses KehadiranStatusEnum
+    Kehadiran -> KehadiranStatusEnum [
+        style=dashed
+        arrowhead=vee
+        label="  «uses»  "
+    ]
+
+    // Notifikasi -> User (many-to-one)
+    Notifikasi -> User [
+        label="  dikirim ke  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="1"
+    ]
+
+    // Notifikasi -> Peminjaman (many-to-one, optional)
+    Notifikasi -> Peminjaman [
+        label="  terkait  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // LogAktivitas -> User (many-to-one, optional)
+    LogAktivitas -> User [
+        label="  dilakukan oleh  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+
+    // LogAktivitas -> Peminjaman (many-to-one, optional)
+    LogAktivitas -> Peminjaman [
+        label="  terkait  "
+        arrowhead=none
+        arrowtail=diamond
+        dir=back
+        taillabel="*"
+        headlabel="0..1"
+    ]
+}

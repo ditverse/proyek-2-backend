@@ -1,0 +1,244 @@
+/*
+ * Activity Diagram - Alur Peminjaman Sarpras
+ * Dibuat dengan Graphviz DOT Language
+ * 
+ * Untuk menghasilkan gambar:
+ * dot -Tpng activity_diagram.dot -o activity_diagram.png
+ * dot -Tsvg activity_diagram.dot -o activity_diagram.svg
+ */
+
+digraph ActivityDiagram {
+    // ========================================
+    // KONFIGURASI GLOBAL
+    // ========================================
+    graph [
+        rankdir=TB
+        splines=ortho
+        nodesep=0.5
+        ranksep=0.7
+        fontname="Segoe UI"
+        fontsize=12
+        bgcolor="#f8fafc"
+        pad=0.5
+        dpi=150
+        label=<<B><FONT POINT-SIZE="22" COLOR="#1e293b">Activity Diagram</FONT></B><BR/><FONT POINT-SIZE="12" COLOR="#64748b">Alur Proses Peminjaman Ruangan &amp; Barang</FONT>>
+        labelloc=t
+        labeljust=c
+    ]
+    
+    node [
+        fontname="Segoe UI"
+        fontsize=10
+        style="filled,rounded"
+        color="#64748b"
+    ]
+    
+    edge [
+        fontname="Segoe UI"
+        fontsize=9
+        color="#475569"
+        penwidth=1.5
+    ]
+
+    // ========================================
+    // SWIMLANES (PARTISI AKTOR)
+    // ========================================
+    subgraph cluster_mahasiswa {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#1e40af">🎓 MAHASISWA</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#eff6ff"
+        color="#3b82f6"
+        penwidth=2
+        margin=25
+        
+        // Aktivitas Mahasiswa
+        login_mhs [label="Login ke Sistem" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        pilih_menu [label="Pilih Menu\nPeminjaman" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        isi_form [label="Isi Formulir\nPeminjaman" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        pilih_ruangan [label="Pilih Ruangan\n& Jadwal" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        pilih_barang [label="Pilih Barang\n(Opsional)" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        upload_surat [label="Upload Surat\nDigital" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        submit [label="Submit\nPengajuan" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        terima_notif [label="Terima Notifikasi\nStatus" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        lihat_jadwal [label="Lihat Jadwal\nPeminjaman" shape=box fillcolor="#dbeafe" color="#2563eb"]
+        hadir_kegiatan [label="Hadir di Lokasi\nSesuai Jadwal" shape=box fillcolor="#dbeafe" color="#2563eb"]
+    }
+
+    subgraph cluster_sarpras {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#166534">📋 SARPRAS</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#f0fdf4"
+        color="#22c55e"
+        penwidth=2
+        margin=25
+        
+        // Aktivitas Sarpras
+        login_sarpras [label="Login ke Sistem" shape=box fillcolor="#dcfce7" color="#16a34a"]
+        cek_pending [label="Cek Daftar\nPending" shape=box fillcolor="#dcfce7" color="#16a34a"]
+        review_detail [label="Review Detail\nPeminjaman" shape=box fillcolor="#dcfce7" color="#16a34a"]
+        cek_jadwal [label="Cek Ketersediaan\nJadwal" shape=box fillcolor="#dcfce7" color="#16a34a"]
+        verifikasi [label="Proses\nVerifikasi" shape=box fillcolor="#dcfce7" color="#16a34a"]
+        tambah_catatan [label="Tambah Catatan\nVerifikasi" shape=box fillcolor="#dcfce7" color="#16a34a"]
+    }
+
+    subgraph cluster_security {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#92400e">🛡️ SECURITY</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#fef3c7"
+        color="#f59e0b"
+        penwidth=2
+        margin=25
+        
+        // Aktivitas Security
+        login_security [label="Login ke Sistem" shape=box fillcolor="#fde68a" color="#d97706"]
+        cek_jadwal_aktif [label="Cek Jadwal\nAktif Hari Ini" shape=box fillcolor="#fde68a" color="#d97706"]
+        verif_kehadiran [label="Verifikasi\nKehadiran" shape=box fillcolor="#fde68a" color="#d97706"]
+        catat_hadir [label="Catat Status\nKehadiran" shape=box fillcolor="#fde68a" color="#d97706"]
+    }
+
+    subgraph cluster_sistem {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#7c2d12">⚙️ SISTEM</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#fff7ed"
+        color="#f97316"
+        penwidth=2
+        margin=25
+        
+        // Aktivitas Sistem
+        validasi_input [label="Validasi\nInput Data" shape=box fillcolor="#fed7aa" color="#ea580c"]
+        simpan_db [label="Simpan ke\nDatabase" shape=box fillcolor="#fed7aa" color="#ea580c"]
+        kirim_notif [label="Kirim Notifikasi\nke Mahasiswa" shape=box fillcolor="#fed7aa" color="#ea580c"]
+        update_status [label="Update Status\nPeminjaman" shape=box fillcolor="#fed7aa" color="#ea580c"]
+        catat_log [label="Catat Log\nAktivitas" shape=box fillcolor="#fed7aa" color="#ea580c"]
+    }
+
+    // ========================================
+    // NODE KHUSUS: START, END, DECISION, FORK
+    // ========================================
+    
+    // Start Node
+    start [label="" shape=circle fillcolor="#1e293b" color="#1e293b" width=0.3 height=0.3]
+    
+    // End Node
+    end_success [label="" shape=doublecircle fillcolor="#1e293b" color="#1e293b" width=0.3 height=0.3]
+    end_reject [label="" shape=doublecircle fillcolor="#ef4444" color="#ef4444" width=0.3 height=0.3]
+    
+    // Decision Nodes
+    decision_valid [label="Data\nValid?" shape=diamond fillcolor="#fef3c7" color="#d97706" width=1 height=1]
+    decision_approve [label="Disetujui?" shape=diamond fillcolor="#fef3c7" color="#d97706" width=1 height=1]
+    decision_hadir [label="Peminjam\nHadir?" shape=diamond fillcolor="#fef3c7" color="#d97706" width=1 height=1]
+    
+    // Fork/Join Nodes
+    fork1 [label="" shape=rect fillcolor="#1e293b" color="#1e293b" width=2 height=0.05]
+    join1 [label="" shape=rect fillcolor="#1e293b" color="#1e293b" width=2 height=0.05]
+
+    // ========================================
+    // ALUR UTAMA: PENGAJUAN PEMINJAMAN
+    // ========================================
+    
+    // Start -> Login Mahasiswa
+    start -> login_mhs [label="  Mulai  "]
+    
+    // Alur Mahasiswa mengisi form
+    login_mhs -> pilih_menu
+    pilih_menu -> isi_form
+    isi_form -> pilih_ruangan
+    pilih_ruangan -> pilih_barang
+    pilih_barang -> upload_surat
+    upload_surat -> submit
+    
+    // Submit -> Validasi Sistem
+    submit -> validasi_input
+    validasi_input -> decision_valid
+    
+    // Decision: Valid?
+    decision_valid -> simpan_db [label="  Ya  " color="#22c55e"]
+    decision_valid -> isi_form [label="  Tidak  " color="#ef4444" style=dashed]
+    
+    // Simpan -> Kirim Notifikasi ke Sarpras
+    simpan_db -> catat_log
+    catat_log -> kirim_notif [label="  Pending  "]
+
+    // ========================================
+    // ALUR VERIFIKASI SARPRAS
+    // ========================================
+    
+    // Paralel: Sarpras login
+    kirim_notif -> fork1
+    fork1 -> terima_notif
+    fork1 -> login_sarpras
+    
+    login_sarpras -> cek_pending
+    cek_pending -> review_detail
+    review_detail -> cek_jadwal
+    cek_jadwal -> verifikasi
+    verifikasi -> tambah_catatan
+    tambah_catatan -> decision_approve
+    
+    // Decision: Disetujui?
+    decision_approve -> update_status [label="  Approved  " color="#22c55e"]
+    decision_approve -> end_reject [label="  Rejected  " color="#ef4444"]
+    
+    // Update status dan notifikasi
+    update_status -> kirim_notif
+    kirim_notif -> terima_notif [style=dashed color="#94a3b8"]
+    terima_notif -> lihat_jadwal
+
+    // ========================================
+    // ALUR KEHADIRAN (HARI-H)
+    // ========================================
+    
+    lihat_jadwal -> hadir_kegiatan [label="  Hari-H  "]
+    
+    // Paralel: Security cek jadwal
+    hadir_kegiatan -> join1
+    login_security -> cek_jadwal_aktif
+    cek_jadwal_aktif -> verif_kehadiran
+    verif_kehadiran -> join1
+    
+    join1 -> decision_hadir
+    
+    // Decision: Hadir?
+    decision_hadir -> catat_hadir [label="  Ya  " color="#22c55e"]
+    decision_hadir -> catat_hadir [label="  Tidak  " color="#ef4444"]
+    
+    catat_hadir -> catat_log
+    catat_log -> end_success [label="  Selesai  "]
+
+    // ========================================
+    // LEGEND
+    // ========================================
+    subgraph cluster_legend {
+        label=<<B><FONT POINT-SIZE="11" COLOR="#475569">📌 KETERANGAN</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#f1f5f9"
+        color="#cbd5e1"
+        penwidth=1
+        margin=15
+        
+        node [shape=plaintext fillcolor="#f1f5f9"]
+        
+        legend [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="5">
+            <TR>
+                <TD><FONT POINT-SIZE="16">●</FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">Start</FONT></TD>
+                <TD WIDTH="20"></TD>
+                <TD><FONT POINT-SIZE="16">◉</FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">End</FONT></TD>
+                <TD WIDTH="20"></TD>
+                <TD><FONT POINT-SIZE="16">◇</FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">Decision</FONT></TD>
+            </TR>
+            <TR>
+                <TD BGCOLOR="#dbeafe" BORDER="1" STYLE="rounded"><FONT POINT-SIZE="9">  </FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">Mahasiswa</FONT></TD>
+                <TD WIDTH="20"></TD>
+                <TD BGCOLOR="#dcfce7" BORDER="1" STYLE="rounded"><FONT POINT-SIZE="9">  </FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">Sarpras</FONT></TD>
+                <TD WIDTH="20"></TD>
+                <TD BGCOLOR="#fde68a" BORDER="1" STYLE="rounded"><FONT POINT-SIZE="9">  </FONT></TD>
+                <TD ALIGN="LEFT"><FONT POINT-SIZE="9">Security</FONT></TD>
+            </TR>
+        </TABLE>>]
+    }
+}

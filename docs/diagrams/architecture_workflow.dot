@@ -1,0 +1,355 @@
+/*
+ * Diagram Arsitektur & Workflow Sistem Peminjaman Sarpras
+ * Dibuat dengan Graphviz DOT Language
+ * 
+ * Untuk menghasilkan gambar:
+ * dot -Tpng architecture_workflow.dot -o architecture_workflow.png
+ * dot -Tsvg architecture_workflow.dot -o architecture_workflow.svg
+ */
+
+digraph SistemPeminjamanSarpras {
+    // ========================================
+    // KONFIGURASI GLOBAL
+    // ========================================
+    graph [
+        rankdir=TB
+        splines=ortho
+        nodesep=0.8
+        ranksep=1.0
+        fontname="Segoe UI"
+        fontsize=14
+        bgcolor="#f8fafc"
+        pad=0.5
+        dpi=150
+        label=<<B><FONT POINT-SIZE="24" COLOR="#1e293b">Arsitektur &amp; Workflow Sistem Peminjaman Sarpras</FONT></B><BR/><FONT POINT-SIZE="12" COLOR="#64748b">Backend API - Go Language</FONT>>
+        labelloc=t
+        labeljust=c
+    ]
+    
+    node [
+        fontname="Segoe UI"
+        fontsize=11
+        style="filled,rounded"
+    ]
+    
+    edge [
+        fontname="Segoe UI"
+        fontsize=9
+        color="#94a3b8"
+    ]
+
+    // ========================================
+    // SUBGRAPH: AKTOR / PENGGUNA
+    // ========================================
+    subgraph cluster_aktor {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#1e40af">👥 AKTOR SISTEM</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#eff6ff"
+        color="#3b82f6"
+        penwidth=2
+        margin=20
+        
+        node [shape=box fillcolor="#dbeafe" color="#2563eb" penwidth=2]
+        
+        mahasiswa [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><FONT POINT-SIZE="20">🎓</FONT></TD></TR>
+            <TR><TD><B>Mahasiswa</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Peminjam Ruangan &amp; Barang</FONT></TD></TR>
+        </TABLE>>]
+        
+        sarpras [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><FONT POINT-SIZE="20">📋</FONT></TD></TR>
+            <TR><TD><B>Sarpras</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Verifikator Peminjaman</FONT></TD></TR>
+        </TABLE>>]
+        
+        security [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><FONT POINT-SIZE="20">🛡️</FONT></TD></TR>
+            <TR><TD><B>Security</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Pencatat Kehadiran</FONT></TD></TR>
+        </TABLE>>]
+        
+        admin [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><FONT POINT-SIZE="20">👑</FONT></TD></TR>
+            <TR><TD><B>Admin</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Akses Penuh Sistem</FONT></TD></TR>
+        </TABLE>>]
+    }
+
+    // ========================================
+    // SUBGRAPH: LAYER API (HANDLERS)
+    // ========================================
+    subgraph cluster_api {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#166534">🔌 LAYER API - HANDLERS</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#f0fdf4"
+        color="#22c55e"
+        penwidth=2
+        margin=20
+        
+        node [shape=component fillcolor="#dcfce7" color="#16a34a" penwidth=2]
+        
+        auth_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>auth_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Login &amp; Register</FONT></TD></TR>
+        </TABLE>>]
+        
+        peminjaman_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>peminjaman_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">CRUD Peminjaman</FONT></TD></TR>
+        </TABLE>>]
+        
+        ruangan_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>ruangan_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Kelola Ruangan</FONT></TD></TR>
+        </TABLE>>]
+        
+        barang_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>barang_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Kelola Barang</FONT></TD></TR>
+        </TABLE>>]
+        
+        kehadiran_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>kehadiran_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Pencatatan Kehadiran</FONT></TD></TR>
+        </TABLE>>]
+        
+        notifikasi_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>notifikasi_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Notifikasi Pengguna</FONT></TD></TR>
+        </TABLE>>]
+        
+        log_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>log_aktivitas_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Riwayat Aktivitas</FONT></TD></TR>
+        </TABLE>>]
+        
+        organisasi_handler [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>organisasi_handler</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Data Organisasi</FONT></TD></TR>
+        </TABLE>>]
+    }
+
+    // ========================================
+    // SUBGRAPH: LAYER BISNIS (SERVICES)
+    // ========================================
+    subgraph cluster_services {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#9333ea">⚙️ LAYER BISNIS - SERVICES</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#faf5ff"
+        color="#a855f7"
+        penwidth=2
+        margin=20
+        
+        node [shape=hexagon fillcolor="#f3e8ff" color="#9333ea" penwidth=2]
+        
+        auth_service [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>auth_service</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">JWT &amp; Validasi</FONT></TD></TR>
+        </TABLE>>]
+        
+        peminjaman_service [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>peminjaman_service</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Logika Peminjaman</FONT></TD></TR>
+        </TABLE>>]
+        
+        kehadiran_service [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>kehadiran_service</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Logika Kehadiran</FONT></TD></TR>
+        </TABLE>>]
+        
+        code_generator [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>code_generator</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Pembuat Kode Unik</FONT></TD></TR>
+        </TABLE>>]
+    }
+
+    // ========================================
+    // SUBGRAPH: LAYER DATA (REPOSITORIES)
+    // ========================================
+    subgraph cluster_repos {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#ea580c">📦 LAYER DATA - REPOSITORIES</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#fff7ed"
+        color="#f97316"
+        penwidth=2
+        margin=20
+        
+        node [shape=folder fillcolor="#fed7aa" color="#ea580c" penwidth=2]
+        
+        user_repo [label="user_repository"]
+        peminjaman_repo [label="peminjaman_repository"]
+        ruangan_repo [label="ruangan_repository"]
+        barang_repo [label="barang_repository"]
+        kehadiran_repo [label="kehadiran_repository"]
+        notifikasi_repo [label="notifikasi_repository"]
+        log_repo [label="log_aktivitas_repository"]
+        organisasi_repo [label="organisasi_repository"]
+    }
+
+    // ========================================
+    // SUBGRAPH: DATABASE & MODELS
+    // ========================================
+    subgraph cluster_database {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#0891b2">🗄️ DATABASE - POSTGRESQL</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#ecfeff"
+        color="#06b6d4"
+        penwidth=2
+        margin=20
+        
+        node [shape=cylinder fillcolor="#cffafe" color="#0891b2" penwidth=2]
+        
+        db [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>PostgreSQL</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9" COLOR="#64748b">Supabase</FONT></TD></TR>
+        </TABLE>>]
+        
+        node [shape=note fillcolor="#a5f3fc" color="#0891b2" penwidth=1]
+        
+        tbl_user [label="users"]
+        tbl_peminjaman [label="peminjaman"]
+        tbl_ruangan [label="ruangan"]
+        tbl_barang [label="barang"]
+        tbl_kehadiran [label="kehadiran"]
+        tbl_notifikasi [label="notifikasi"]
+        tbl_log [label="log_aktivitas"]
+        tbl_organisasi [label="organisasi"]
+    }
+
+    // ========================================
+    // SUBGRAPH: MIDDLEWARE
+    // ========================================
+    subgraph cluster_middleware {
+        label=<<B><FONT POINT-SIZE="14" COLOR="#be123c">🔐 MIDDLEWARE</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#fff1f2"
+        color="#f43f5e"
+        penwidth=2
+        margin=20
+        
+        node [shape=octagon fillcolor="#fecdd3" color="#e11d48" penwidth=2]
+        
+        cors_middleware [label="CORS"]
+        auth_middleware [label="AuthMiddleware"]
+        role_middleware [label="RequireRole"]
+    }
+
+    // ========================================
+    // KONEKSI: AKTOR KE API
+    // ========================================
+    edge [color="#3b82f6" penwidth=1.5 style=dashed]
+    
+    mahasiswa -> auth_handler [label="Login/Register"]
+    mahasiswa -> peminjaman_handler [label="Ajukan Peminjaman"]
+    mahasiswa -> notifikasi_handler [label="Lihat Notifikasi"]
+    
+    sarpras -> peminjaman_handler [label="Verifikasi"]
+    sarpras -> ruangan_handler [label="Kelola"]
+    sarpras -> barang_handler [label="Kelola"]
+    
+    security -> kehadiran_handler [label="Catat Kehadiran"]
+    security -> peminjaman_handler [label="Lihat Jadwal"]
+    
+    admin -> log_handler [label="Audit Log"]
+    admin -> peminjaman_handler [label="Full Access"]
+
+    // ========================================
+    // KONEKSI: MIDDLEWARE KE HANDLERS
+    // ========================================
+    edge [color="#e11d48" penwidth=1 style=solid]
+    
+    cors_middleware -> auth_handler
+    cors_middleware -> peminjaman_handler
+    auth_middleware -> peminjaman_handler
+    auth_middleware -> kehadiran_handler
+    auth_middleware -> notifikasi_handler
+    role_middleware -> ruangan_handler [label="SARPRAS/ADMIN"]
+    role_middleware -> barang_handler [label="SARPRAS/ADMIN"]
+    role_middleware -> kehadiran_handler [label="SECURITY/ADMIN"]
+    role_middleware -> log_handler [label="ADMIN"]
+
+    // ========================================
+    // KONEKSI: HANDLERS KE SERVICES
+    // ========================================
+    edge [color="#22c55e" penwidth=1.5 style=solid]
+    
+    auth_handler -> auth_service
+    peminjaman_handler -> peminjaman_service
+    kehadiran_handler -> kehadiran_service
+    peminjaman_service -> code_generator
+
+    // ========================================
+    // KONEKSI: SERVICES KE REPOSITORIES
+    // ========================================
+    edge [color="#9333ea" penwidth=1.5 style=solid]
+    
+    auth_service -> user_repo
+    peminjaman_service -> peminjaman_repo
+    peminjaman_service -> barang_repo
+    peminjaman_service -> notifikasi_repo
+    peminjaman_service -> log_repo
+    peminjaman_service -> user_repo
+    kehadiran_service -> kehadiran_repo
+    kehadiran_service -> peminjaman_repo
+    kehadiran_service -> log_repo
+    
+    // Direct handler to repo connections
+    edge [color="#f97316" penwidth=1 style=dashed]
+    
+    ruangan_handler -> ruangan_repo
+    barang_handler -> barang_repo
+    notifikasi_handler -> notifikasi_repo
+    log_handler -> log_repo
+    organisasi_handler -> organisasi_repo
+
+    // ========================================
+    // KONEKSI: REPOSITORIES KE DATABASE
+    // ========================================
+    edge [color="#0891b2" penwidth=2 style=solid]
+    
+    user_repo -> db
+    peminjaman_repo -> db
+    ruangan_repo -> db
+    barang_repo -> db
+    kehadiran_repo -> db
+    notifikasi_repo -> db
+    log_repo -> db
+    organisasi_repo -> db
+    
+    // Database to tables
+    edge [color="#06b6d4" penwidth=1 style=dotted]
+    
+    db -> tbl_user
+    db -> tbl_peminjaman
+    db -> tbl_ruangan
+    db -> tbl_barang
+    db -> tbl_kehadiran
+    db -> tbl_notifikasi
+    db -> tbl_log
+    db -> tbl_organisasi
+
+    // ========================================
+    // LEGEND
+    // ========================================  
+    subgraph cluster_legend {
+        label=<<B><FONT POINT-SIZE="12" COLOR="#475569">📌 KETERANGAN</FONT></B>>
+        style="rounded,filled"
+        fillcolor="#f1f5f9"
+        color="#cbd5e1"
+        penwidth=1
+        margin=15
+        
+        node [shape=plaintext fillcolor="#f1f5f9"]
+        
+        legend [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="5">
+            <TR>
+                <TD BGCOLOR="#dbeafe" BORDER="1" STYLE="rounded" WIDTH="60"><FONT POINT-SIZE="9">Aktor</FONT></TD>
+                <TD BGCOLOR="#dcfce7" BORDER="1" STYLE="rounded" WIDTH="60"><FONT POINT-SIZE="9">Handler</FONT></TD>
+                <TD BGCOLOR="#f3e8ff" BORDER="1" STYLE="rounded" WIDTH="60"><FONT POINT-SIZE="9">Service</FONT></TD>
+                <TD BGCOLOR="#fed7aa" BORDER="1" STYLE="rounded" WIDTH="60"><FONT POINT-SIZE="9">Repository</FONT></TD>
+                <TD BGCOLOR="#cffafe" BORDER="1" STYLE="rounded" WIDTH="60"><FONT POINT-SIZE="9">Database</FONT></TD>
+            </TR>
+        </TABLE>>]
+    }
+}

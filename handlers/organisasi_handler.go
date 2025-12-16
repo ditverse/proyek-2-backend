@@ -39,7 +39,7 @@ func (h *OrganisasiHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	for i, org := range orgs {
 		result[i] = OrganisasiListItem{
 			KodeOrganisasi: org.KodeOrganisasi,
-			NamaOrganisasi: org.Nama,
+			NamaOrganisasi: org.NamaOrganisasi,
 		}
 	}
 

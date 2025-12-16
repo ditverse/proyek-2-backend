@@ -19,6 +19,7 @@ type PeminjamanHandler struct {
 	PeminjamanRepo    *repositories.PeminjamanRepository
 	RuanganRepo       *repositories.RuanganRepository
 	UserRepo          *repositories.UserRepository
+	OrganisasiRepo    *repositories.OrganisasiRepository
 }
 
 func NewPeminjamanHandler(
@@ -26,12 +27,14 @@ func NewPeminjamanHandler(
 	peminjamanRepo *repositories.PeminjamanRepository,
 	ruanganRepo *repositories.RuanganRepository,
 	userRepo *repositories.UserRepository,
+	organisasiRepo *repositories.OrganisasiRepository,
 ) *PeminjamanHandler {
 	return &PeminjamanHandler{
 		PeminjamanService: peminjamanService,
 		PeminjamanRepo:    peminjamanRepo,
 		RuanganRepo:       ruanganRepo,
 		UserRepo:          userRepo,
+		OrganisasiRepo:    organisasiRepo,
 	}
 }
 
@@ -549,6 +552,11 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
 			user.PasswordHash = ""
+			// Load organisasi data jika user memiliki organisasi_kode
+			if user.OrganisasiKode != nil {
+				organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
+				user.Organisasi = organisasi
+			}
 			peminjaman[i].Peminjam = user
 		}
 		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)

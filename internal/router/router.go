@@ -51,6 +51,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		peminjamanRepo,
 		ruanganRepo,
 		userRepo,
+		organisasiRepo,
 	)
 	kehadiranHandler := handlers.NewKehadiranHandler(
 		kehadiranService,

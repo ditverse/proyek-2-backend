@@ -16,6 +16,7 @@ type PeminjamanService struct {
 	NotifikasiRepo *repositories.NotifikasiRepository
 	LogRepo        *repositories.LogAktivitasRepository
 	UserRepo       *repositories.UserRepository
+	KegiatanRepo   *repositories.KegiatanRepository
 }
 
 func NewPeminjamanService(
@@ -24,6 +25,7 @@ func NewPeminjamanService(
 	notifikasiRepo *repositories.NotifikasiRepository,
 	logRepo *repositories.LogAktivitasRepository,
 	userRepo *repositories.UserRepository,
+	kegiatanRepo *repositories.KegiatanRepository,
 ) *PeminjamanService {
 	return &PeminjamanService{
 		PeminjamanRepo: peminjamanRepo,
@@ -31,6 +33,7 @@ func NewPeminjamanService(
 		NotifikasiRepo: notifikasiRepo,
 		LogRepo:        logRepo,
 		UserRepo:       userRepo,
+		KegiatanRepo:   kegiatanRepo,
 	}
 }
 
@@ -72,13 +75,44 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 		}
 	}
 
+	// Get user untuk ambil organisasi_kode
+	user, err := s.UserRepo.GetByID(kodeUser)
+	if err != nil {
+		return nil, errors.New("gagal mengambil data user")
+	}
+	if user == nil {
+		return nil, errors.New("user tidak ditemukan")
+	}
+
+	// Auto-create kegiatan dari data peminjaman
+	var kodeKegiatan *string
+	if req.NamaKegiatan != "" {
+		organisasiKode := ""
+		if user.OrganisasiKode != nil {
+			organisasiKode = *user.OrganisasiKode
+		}
+
+		kegiatan := &models.Kegiatan{
+			KodeKegiatan:   generateCode("KGT"),
+			NamaKegiatan:   req.NamaKegiatan,
+			Deskripsi:      req.Deskripsi,
+			TanggalMulai:   tanggalMulai,
+			TanggalSelesai: tanggalSelesai,
+			OrganisasiKode: organisasiKode,
+		}
+
+		if err := s.KegiatanRepo.Create(kegiatan); err != nil {
+			return nil, fmt.Errorf("gagal membuat kegiatan: %v", err)
+		}
+		kodeKegiatan = &kegiatan.KodeKegiatan
+	}
+
 	peminjaman := &models.Peminjaman{
 		KodeUser:         kodeUser,
 		KodeRuangan:      req.KodeRuangan,
-		KodeKegiatan:     req.KodeKegiatan,
+		KodeKegiatan:     kodeKegiatan,
 		TanggalMulai:     tanggalMulai,
 		TanggalSelesai:   tanggalSelesai,
-		Keperluan:        req.Keperluan,
 		Status:           models.StatusPeminjamanPending,
 		PathSuratDigital: suratPath, // Use the resolved path
 	}

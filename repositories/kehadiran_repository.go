@@ -100,6 +100,57 @@ func (r *KehadiranRepository) GetAll(start, end string) ([]models.KehadiranPemin
 	return kehadiran, nil
 }
 
-func (r *KehadiranRepository) GetBySecurityID(_ int) ([]models.KehadiranPeminjam, error) {
-	return []models.KehadiranPeminjam{}, nil
+
+// GetRiwayat returns all kehadiran records with optional date filtering
+func (r *KehadiranRepository) GetRiwayat(start, end *string) ([]models.KehadiranPeminjam, error) {
+	query := `
+		SELECT kode_kehadiran, kode_peminjaman, status_kehadiran, waktu_konfirmasi, keterangan,
+		       diverifikasi_oleh, created_at, updated_at
+		FROM kehadiran_peminjam
+	`
+	args := []interface{}{}
+	
+	// Add date filter if both start and end provided
+	if start != nil && end != nil && *start != "" && *end != "" {
+		query += ` WHERE waktu_konfirmasi BETWEEN $1 AND $2`
+		args = append(args, *start, *end)
+	}
+	
+	query += ` ORDER BY waktu_konfirmasi DESC`
+	
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var kehadiranList []models.KehadiranPeminjam
+	for rows.Next() {
+		var k models.KehadiranPeminjam
+		var verifier sql.NullString
+		err := rows.Scan(
+			&k.KodeKehadiran,
+			&k.KodePeminjaman,
+			&k.StatusKehadiran,
+			&k.WaktuKonfirmasi,
+			&k.Keterangan,
+			&verifier,
+			&k.CreatedAt,
+			&k.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if verifier.Valid {
+			k.DiverifikasiOleh = &verifier.String
+		}
+		kehadiranList = append(kehadiranList, k)
+	}
+	
+	if kehadiranList == nil {
+		kehadiranList = []models.KehadiranPeminjam{}
+	}
+	
+	return kehadiranList, nil
 }
+

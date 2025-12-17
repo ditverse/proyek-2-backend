@@ -18,9 +18,9 @@ func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 	query := `
 		INSERT INTO peminjaman (
 			kode_user, kode_ruangan, kode_kegiatan,
-			tanggal_mulai, tanggal_selesai, keperluan, status, path_surat_digital
+			tanggal_mulai, tanggal_selesai, status, path_surat_digital
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING kode_peminjaman, created_at
 	`
 	var kodeRuangan interface{}
@@ -38,7 +38,6 @@ func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 		kodeKegiatan,
 		peminjaman.TanggalMulai,
 		peminjaman.TanggalSelesai,
-		peminjaman.Keperluan,
 		peminjaman.Status,
 		peminjaman.PathSuratDigital,
 	).Scan(&peminjaman.KodePeminjaman, &peminjaman.CreatedAt)
@@ -56,7 +55,7 @@ func (r *PeminjamanRepository) CreatePeminjamanBarang(kodePeminjamanBarang, kode
 func (r *PeminjamanRepository) GetByID(kodePeminjaman string) (*models.Peminjaman, error) {
 	query := `
 		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       keperluan, status, path_surat_digital, verified_by, verified_at,
+		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
 		WHERE kode_peminjaman = $1
@@ -78,7 +77,6 @@ func (r *PeminjamanRepository) GetByID(kodePeminjaman string) (*models.Peminjama
 		&kodeKegiatan,
 		&p.TanggalMulai,
 		&p.TanggalSelesai,
-		&p.Keperluan,
 		&p.Status,
 		&p.PathSuratDigital,
 		&verifiedBy,
@@ -93,6 +91,7 @@ func (r *PeminjamanRepository) GetByID(kodePeminjaman string) (*models.Peminjama
 	if err != nil {
 		return nil, err
 	}
+	
 	if kodeRuangan.Valid {
 		p.KodeRuangan = &kodeRuangan.String
 	}
@@ -135,7 +134,6 @@ func (r *PeminjamanRepository) scanRows(rows *sql.Rows) ([]models.Peminjaman, er
 			&kodeKegiatan,
 			&row.TanggalMulai,
 			&row.TanggalSelesai,
-			&row.Keperluan,
 			&row.Status,
 			&row.PathSuratDigital,
 			&verifiedBy,
@@ -175,7 +173,7 @@ func (r *PeminjamanRepository) scanRows(rows *sql.Rows) ([]models.Peminjaman, er
 func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminjaman, error) {
 	query := `
 		SELECT p.kode_peminjaman, p.kode_user, p.kode_ruangan, p.kode_kegiatan, p.tanggal_mulai, p.tanggal_selesai,
-		       p.keperluan, p.status, p.path_surat_digital, p.verified_by, p.verified_at,
+		       p.status, p.path_surat_digital, p.verified_by, p.verified_at,
 		       p.catatan_verifikasi, p.created_at, p.updated_at,
 		       r.kode_ruangan, r.nama_ruangan, r.lokasi, r.kapasitas, r.deskripsi
 		FROM peminjaman p
@@ -214,7 +212,6 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 			&kodeKegiatan,
 			&row.TanggalMulai,
 			&row.TanggalSelesai,
-			&row.Keperluan,
 			&row.Status,
 			&row.PathSuratDigital,
 			&verifiedBy,
@@ -272,7 +269,7 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 func (r *PeminjamanRepository) GetPending() ([]models.Peminjaman, error) {
 	query := `
 		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       keperluan, status, path_surat_digital, verified_by, verified_at,
+		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
 		WHERE status = 'PENDING'
@@ -289,10 +286,11 @@ func (r *PeminjamanRepository) GetPending() ([]models.Peminjaman, error) {
 func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.JadwalRuanganResponse, error) {
 	query := `
 		SELECT p.kode_peminjaman, p.kode_ruangan, r.nama_ruangan, p.tanggal_mulai, p.tanggal_selesai,
-		       p.status, u.nama
+		       p.status, u.nama, COALESCE(o.nama, '') as nama_organisasi
 		FROM peminjaman p
 		JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
 		JOIN users u ON p.kode_user = u.kode_user
+		LEFT JOIN organisasi o ON u.organisasi_kode = o.kode_organisasi
 		WHERE p.kode_ruangan IS NOT NULL
 		  AND p.status = 'APPROVED'
 		  AND p.tanggal_mulai <= $2
@@ -316,6 +314,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 			&j.TanggalSelesai,
 			&j.Status,
 			&j.Peminjam,
+			&j.Organisasi,
 		)
 		if err != nil {
 			return nil, err
@@ -331,7 +330,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 func (r *PeminjamanRepository) GetJadwalAktif(start, end time.Time) ([]models.Peminjaman, error) {
 	query := `
 		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       keperluan, status, path_surat_digital, verified_by, verified_at,
+		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
 		WHERE status = 'APPROVED'
@@ -351,7 +350,7 @@ func (r *PeminjamanRepository) GetJadwalAktif(start, end time.Time) ([]models.Pe
 func (r *PeminjamanRepository) GetJadwalAktifBelumVerifikasi(start, end time.Time) ([]models.Peminjaman, error) {
 	query := `
 		SELECT p.kode_peminjaman, p.kode_user, p.kode_ruangan, p.kode_kegiatan, p.tanggal_mulai, p.tanggal_selesai,
-		       p.keperluan, p.status, p.path_surat_digital, p.verified_by, p.verified_at,
+		       p.status, p.path_surat_digital, p.verified_by, p.verified_at,
 		       p.catatan_verifikasi, p.created_at, p.updated_at
 		FROM peminjaman p
 		LEFT JOIN kehadiran_peminjam k ON k.kode_peminjaman = p.kode_peminjaman
@@ -434,7 +433,7 @@ func (r *PeminjamanRepository) GetPeminjamanBarang(kodePeminjaman string) ([]mod
 func (r *PeminjamanRepository) GetLaporan(start, end time.Time, status models.PeminjamanStatusEnum) ([]models.Peminjaman, error) {
 	query := `
 		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       keperluan, status, path_surat_digital, verified_by, verified_at,
+		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
 		WHERE created_at >= $1 AND created_at <= $2

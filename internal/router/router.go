@@ -26,6 +26,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	notifikasiRepo := repositories.NewNotifikasiRepository(db)
 	logRepo := repositories.NewLogAktivitasRepository(db)
 	organisasiRepo := repositories.NewOrganisasiRepository(db)
+	kegiatanRepo := repositories.NewKegiatanRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
@@ -35,6 +36,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		notifikasiRepo,
 		logRepo,
 		userRepo,
+		kegiatanRepo,
 	)
 	kehadiranService := services.NewKehadiranService(
 		kehadiranRepo,
@@ -52,6 +54,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		ruanganRepo,
 		userRepo,
 		organisasiRepo,
+		kegiatanRepo,
 	)
 	kehadiranHandler := handlers.NewKehadiranHandler(
 		kehadiranService,
@@ -59,6 +62,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		peminjamanRepo,
 		ruanganRepo,
 		userRepo,
+		kegiatanRepo,
 	)
 	notifikasiHandler := handlers.NewNotifikasiHandler(notifikasiRepo)
 	logHandler := handlers.NewLogAktivitasHandler(logRepo)

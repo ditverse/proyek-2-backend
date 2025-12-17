@@ -20,6 +20,7 @@ type PeminjamanHandler struct {
 	RuanganRepo       *repositories.RuanganRepository
 	UserRepo          *repositories.UserRepository
 	OrganisasiRepo    *repositories.OrganisasiRepository
+	KegiatanRepo      *repositories.KegiatanRepository
 }
 
 func NewPeminjamanHandler(
@@ -28,6 +29,7 @@ func NewPeminjamanHandler(
 	ruanganRepo *repositories.RuanganRepository,
 	userRepo *repositories.UserRepository,
 	organisasiRepo *repositories.OrganisasiRepository,
+	kegiatanRepo *repositories.KegiatanRepository,
 ) *PeminjamanHandler {
 	return &PeminjamanHandler{
 		PeminjamanService: peminjamanService,
@@ -35,6 +37,7 @@ func NewPeminjamanHandler(
 		RuanganRepo:       ruanganRepo,
 		UserRepo:          userRepo,
 		OrganisasiRepo:    organisasiRepo,
+		KegiatanRepo:      kegiatanRepo,
 	}
 }
 
@@ -96,6 +99,10 @@ func (h *PeminjamanHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		ruangan, _ := h.RuanganRepo.GetByID(*peminjaman.KodeRuangan)
 		peminjaman.Ruangan = ruangan
 	}
+	if peminjaman.KodeKegiatan != nil {
+		kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan)
+		peminjaman.Kegiatan = kegiatan
+	}
 	user, _ := h.UserRepo.GetByID(peminjaman.KodeUser)
 	if user != nil {
 		user.PasswordHash = ""
@@ -131,6 +138,10 @@ func (h *PeminjamanHandler) GetMyPeminjaman(w http.ResponseWriter, r *http.Reque
 		if peminjaman[i].KodeRuangan != nil {
 			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
 			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
 		}
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
@@ -299,6 +310,10 @@ func (h *PeminjamanHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
 			peminjaman[i].Ruangan = ruangan
 		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
 			user.PasswordHash = ""
@@ -434,6 +449,10 @@ func (h *PeminjamanHandler) GetJadwalAktif(w http.ResponseWriter, r *http.Reques
 			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
 			peminjaman[i].Ruangan = ruangan
 		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
 			user.PasswordHash = ""
@@ -488,6 +507,10 @@ func (h *PeminjamanHandler) GetJadwalAktifBelumVerifikasi(w http.ResponseWriter,
 		if peminjaman[i].KodeRuangan != nil {
 			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
 			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
 		}
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
@@ -548,6 +571,10 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 		if peminjaman[i].KodeRuangan != nil {
 			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
 			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
 		}
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {

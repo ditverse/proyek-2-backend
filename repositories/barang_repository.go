@@ -110,4 +110,3 @@ func (r *BarangRepository) Delete(kodeBarang string) error {
 	_, err := r.DB.Exec(query, kodeBarang)
 	return err
 }
-

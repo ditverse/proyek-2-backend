@@ -23,4 +23,3 @@ type UpdateBarangRequest struct {
 	JumlahTotal int     `json:"jumlah_total"`
 	RuanganKode *string `json:"ruangan_kode"`
 }
-

@@ -28,6 +28,10 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	organisasiRepo := repositories.NewOrganisasiRepository(db)
 	kegiatanRepo := repositories.NewKegiatanRepository(db)
 
+	// Initialize notification services
+	emailService := services.NewEmailService(cfg)
+	whatsappService := services.NewWhatsappService(cfg)
+
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
 	peminjamanService := services.NewPeminjamanService(
@@ -37,6 +41,9 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		logRepo,
 		userRepo,
 		kegiatanRepo,
+		ruanganRepo,
+		emailService,
+		whatsappService,
 	)
 	kehadiranService := services.NewKehadiranService(
 		kehadiranRepo,

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	storagesvc "backend-sarpras/internal/services"
@@ -11,12 +12,15 @@ import (
 )
 
 type PeminjamanService struct {
-	PeminjamanRepo *repositories.PeminjamanRepository
-	BarangRepo     *repositories.BarangRepository
-	NotifikasiRepo *repositories.NotifikasiRepository
-	LogRepo        *repositories.LogAktivitasRepository
-	UserRepo       *repositories.UserRepository
-	KegiatanRepo   *repositories.KegiatanRepository
+	PeminjamanRepo  *repositories.PeminjamanRepository
+	BarangRepo      *repositories.BarangRepository
+	NotifikasiRepo  *repositories.NotifikasiRepository
+	LogRepo         *repositories.LogAktivitasRepository
+	UserRepo        *repositories.UserRepository
+	KegiatanRepo    *repositories.KegiatanRepository
+	RuanganRepo     *repositories.RuanganRepository
+	EmailService    *EmailService
+	WhatsappService *WhatsappService
 }
 
 func NewPeminjamanService(
@@ -26,14 +30,20 @@ func NewPeminjamanService(
 	logRepo *repositories.LogAktivitasRepository,
 	userRepo *repositories.UserRepository,
 	kegiatanRepo *repositories.KegiatanRepository,
+	ruanganRepo *repositories.RuanganRepository,
+	emailService *EmailService,
+	whatsappService *WhatsappService,
 ) *PeminjamanService {
 	return &PeminjamanService{
-		PeminjamanRepo: peminjamanRepo,
-		BarangRepo:     barangRepo,
-		NotifikasiRepo: notifikasiRepo,
-		LogRepo:        logRepo,
-		UserRepo:       userRepo,
-		KegiatanRepo:   kegiatanRepo,
+		PeminjamanRepo:  peminjamanRepo,
+		BarangRepo:      barangRepo,
+		NotifikasiRepo:  notifikasiRepo,
+		LogRepo:         logRepo,
+		UserRepo:        userRepo,
+		KegiatanRepo:    kegiatanRepo,
+		RuanganRepo:     ruanganRepo,
+		EmailService:    emailService,
+		WhatsappService: whatsappService,
 	}
 }
 
@@ -169,8 +179,19 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 	})
 
 	kodePeminjaman := peminjaman.KodePeminjaman
+
+	// Get ruangan name for notification
+	namaRuangan := "Ruangan"
+	if req.KodeRuangan != nil && s.RuanganRepo != nil {
+		if ruangan, err := s.RuanganRepo.GetByID(*req.KodeRuangan); err == nil && ruangan != nil {
+			namaRuangan = ruangan.NamaRuangan
+		}
+	}
+
+	// Notify Sarpras staff about new peminjaman
 	if petugas, err := s.UserRepo.GetByRole(models.RoleSarpras); err == nil && len(petugas) > 0 {
 		for _, u := range petugas {
+			// Create in-app notification
 			s.NotifikasiRepo.Create(&models.Notifikasi{
 				KodeNotifikasi:  generateCode("NTF"),
 				KodeUser:        u.KodeUser,
@@ -179,6 +200,23 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 				Pesan:           "Pengajuan peminjaman baru menunggu verifikasi",
 				Status:          models.NotifikasiTerkirim,
 			})
+
+			// Send email notification to Sarpras
+			if s.EmailService != nil && s.EmailService.IsConfigured() {
+				emailBody := EmailTemplatePengajuanBaru(
+					user.Nama,
+					req.NamaKegiatan,
+					namaRuangan,
+					tanggalMulai,
+					tanggalSelesai,
+				)
+				s.EmailService.SendEmailHTML(
+					u.Email,
+					fmt.Sprintf("📋 Pengajuan Peminjaman Baru - %s", user.Nama),
+					emailBody,
+				)
+				log.Printf("📧 Email notification sent to Sarpras: %s", u.Email)
+			}
 		}
 	}
 
@@ -214,6 +252,30 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 		Keterangan:     fmt.Sprintf("Status peminjaman diubah menjadi %s", req.Status),
 	})
 
+	// Get peminjam data for notification
+	peminjam, err := s.UserRepo.GetByID(peminjaman.KodeUser)
+	if err != nil || peminjam == nil {
+		log.Printf("⚠️ Could not get peminjam data: %v", err)
+		peminjam = &models.User{Nama: "Peminjam", Email: ""}
+	}
+
+	// Get ruangan name
+	namaRuangan := "Ruangan"
+	if peminjaman.KodeRuangan != nil && s.RuanganRepo != nil {
+		if ruangan, err := s.RuanganRepo.GetByID(*peminjaman.KodeRuangan); err == nil && ruangan != nil {
+			namaRuangan = ruangan.NamaRuangan
+		}
+	}
+
+	// Get kegiatan name
+	namaKegiatan := "Kegiatan"
+	if peminjaman.KodeKegiatan != nil && s.KegiatanRepo != nil {
+		if kegiatan, err := s.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan); err == nil && kegiatan != nil {
+			namaKegiatan = kegiatan.NamaKegiatan
+		}
+	}
+
+	// Create in-app notification message
 	pesan := "Pengajuan peminjaman Anda telah " + string(req.Status)
 	if req.Status == models.StatusPeminjamanRejected && req.CatatanVerifikasi != "" {
 		pesan += ". Catatan: " + req.CatatanVerifikasi
@@ -226,6 +288,8 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 	} else {
 		jenis = models.NotifStatusRejected
 	}
+
+	// Create in-app notification for peminjam
 	s.NotifikasiRepo.Create(&models.Notifikasi{
 		KodeNotifikasi:  generateCode("NTF"),
 		KodeUser:        peminjamKode,
@@ -234,6 +298,76 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 		Pesan:           pesan,
 		Status:          models.NotifikasiTerkirim,
 	})
+
+	// Send external notifications based on status
+	if req.Status == models.StatusPeminjamanApproved {
+		// ===== APPROVED: Email + WA to Mahasiswa, WA to Security =====
+
+		// 1. Send Email to Mahasiswa
+		if s.EmailService != nil && s.EmailService.IsConfigured() && peminjam.Email != "" {
+			emailBody := EmailTemplateApproved(
+				peminjam.Nama,
+				namaKegiatan,
+				namaRuangan,
+				peminjaman.TanggalMulai,
+				peminjaman.TanggalSelesai,
+			)
+			s.EmailService.SendEmailHTML(
+				peminjam.Email,
+				fmt.Sprintf("✅ Peminjaman Disetujui - %s", namaKegiatan),
+				emailBody,
+			)
+			log.Printf("📧 Approval email sent to: %s", peminjam.Email)
+		}
+
+		// 2. Send WhatsApp to Mahasiswa
+		if s.WhatsappService != nil && s.WhatsappService.IsConfigured() && peminjam.NoHP != nil && *peminjam.NoHP != "" {
+			waMessage := WATemplateApproved(namaKegiatan, namaRuangan)
+			s.WhatsappService.SendMessage(*peminjam.NoHP, waMessage)
+			log.Printf("💬 Approval WhatsApp sent to: %s", *peminjam.NoHP)
+		}
+
+		// 3. Send WhatsApp to Security
+		if s.WhatsappService != nil && s.WhatsappService.IsConfigured() {
+			if securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity); err == nil && len(securityUsers) > 0 {
+				for _, security := range securityUsers {
+					if security.NoHP != nil && *security.NoHP != "" {
+						waMessage := WATemplateSecurity(
+							namaKegiatan,
+							namaRuangan,
+							peminjaman.TanggalMulai,
+							peminjaman.TanggalSelesai,
+						)
+						s.WhatsappService.SendMessage(*security.NoHP, waMessage)
+						log.Printf("💬 Security WhatsApp sent to: %s", *security.NoHP)
+					}
+				}
+			}
+		}
+
+	} else if req.Status == models.StatusPeminjamanRejected {
+		// ===== REJECTED: Email to Mahasiswa =====
+		if s.EmailService != nil && s.EmailService.IsConfigured() && peminjam.Email != "" {
+			alasan := req.CatatanVerifikasi
+			if alasan == "" {
+				alasan = "Tidak ada alasan yang diberikan."
+			}
+			emailBody := EmailTemplateRejected(
+				peminjam.Nama,
+				namaKegiatan,
+				namaRuangan,
+				alasan,
+				peminjaman.TanggalMulai,
+				peminjaman.TanggalSelesai,
+			)
+			s.EmailService.SendEmailHTML(
+				peminjam.Email,
+				fmt.Sprintf("❌ Peminjaman Ditolak - %s", namaKegiatan),
+				emailBody,
+			)
+			log.Printf("📧 Rejection email sent to: %s", peminjam.Email)
+		}
+	}
 
 	return nil
 }

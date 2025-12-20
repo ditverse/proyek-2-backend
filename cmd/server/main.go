@@ -4,7 +4,10 @@ import (
 	"backend-sarpras/internal/config"
 	"backend-sarpras/internal/db"
 	"backend-sarpras/internal/router"
+	"backend-sarpras/internal/scheduler"
 	"backend-sarpras/middleware"
+	"backend-sarpras/repositories"
+	"backend-sarpras/services"
 	"context"
 	"log"
 	"net/http"
@@ -27,6 +30,25 @@ func main() {
 
 	// Setup router dengan config
 	handler := router.New(conn, cfg)
+
+	// Initialize repositories and services for scheduler
+	peminjamanRepo := repositories.NewPeminjamanRepository(conn)
+	userRepo := repositories.NewUserRepository(conn)
+	notifikasiRepo := repositories.NewNotifikasiRepository(conn)
+	ruanganRepo := repositories.NewRuanganRepository(conn)
+	whatsappService := services.NewWhatsappService(cfg)
+
+	// Start reminder scheduler (runs every 5 minutes)
+	reminderScheduler := scheduler.NewReminderScheduler(
+		conn,
+		peminjamanRepo,
+		userRepo,
+		notifikasiRepo,
+		ruanganRepo,
+		whatsappService,
+	)
+	reminderScheduler.Start(5 * time.Minute)
+	defer reminderScheduler.Stop()
 
 	// Create HTTP server dengan timeout
 	server := &http.Server{

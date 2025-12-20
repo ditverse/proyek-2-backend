@@ -50,6 +50,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		peminjamanRepo,
 		logRepo,
 	)
+	exportService := services.NewExportService()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -70,6 +71,14 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		ruanganRepo,
 		userRepo,
 		kegiatanRepo,
+	)
+	exportHandler := handlers.NewExportHandler(
+		peminjamanRepo,
+		ruanganRepo,
+		userRepo,
+		organisasiRepo,
+		kegiatanRepo,
+		exportService,
 	)
 	notifikasiHandler := handlers.NewNotifikasiHandler(notifikasiRepo)
 	logHandler := handlers.NewLogAktivitasHandler(logRepo)
@@ -184,6 +193,8 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.Handle("/api/jadwal-aktif", withRole(http.HandlerFunc(peminjamanHandler.GetJadwalAktif), "SECURITY", "ADMIN"))
 	mux.Handle("/api/jadwal-aktif-belum-verifikasi", withRole(http.HandlerFunc(peminjamanHandler.GetJadwalAktifBelumVerifikasi), "SECURITY", "ADMIN"))
 	mux.Handle("/api/laporan/peminjaman", withRole(http.HandlerFunc(peminjamanHandler.GetLaporan), "SARPRAS", "ADMIN"))
+	mux.Handle("/api/laporan/peminjaman/export", withRole(http.HandlerFunc(exportHandler.ExportPeminjamanToExcel), "SARPRAS", "ADMIN"))
+
 
 	// Protected routes - Kehadiran
 	mux.Handle("/api/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.Create), "SECURITY", "ADMIN"))

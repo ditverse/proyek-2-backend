@@ -556,9 +556,34 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Validate status parameter
 	var status models.PeminjamanStatusEnum
 	if statusStr != "" {
 		status = models.PeminjamanStatusEnum(statusStr)
+		// Validate status is one of the valid enum values
+		validStatuses := []models.PeminjamanStatusEnum{
+			models.StatusPeminjamanPending,
+			models.StatusPeminjamanApproved,
+			models.StatusPeminjamanRejected,
+			models.StatusPeminjamanOngoing,
+			models.StatusPeminjamanFinished,
+			models.StatusPeminjamanCanceled,
+		}
+		isValid := false
+		for _, validStatus := range validStatuses {
+			if status == validStatus {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid status. Must be one of: PENDING, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED",
+			})
+			return
+		}
 	}
 
 	peminjaman, err := h.PeminjamanRepo.GetLaporan(start, end, status)

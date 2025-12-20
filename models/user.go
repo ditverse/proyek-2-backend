@@ -29,5 +29,6 @@ type RegisterRequest struct {
 	Email          string   `json:"email"`
 	Password       string   `json:"password"`
 	Role           RoleEnum `json:"role"`
+	NoHP           *string  `json:"no_hp"`
 	OrganisasiKode *string  `json:"organisasi_kode"`
 }

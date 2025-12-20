@@ -90,6 +90,7 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.User, error
 		Email:          req.Email,
 		PasswordHash:   passwordHash,
 		Role:           req.Role,
+		NoHP:           req.NoHP,
 		OrganisasiKode: req.OrganisasiKode,
 	}
 

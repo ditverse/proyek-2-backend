@@ -4,23 +4,31 @@ import (
 	"backend-sarpras/models"
 	"backend-sarpras/repositories"
 	"errors"
+	"fmt"
+	"log"
 )
 
 type KehadiranService struct {
 	KehadiranRepo  *repositories.KehadiranRepository
 	PeminjamanRepo *repositories.PeminjamanRepository
 	LogRepo        *repositories.LogAktivitasRepository
+	NotifikasiRepo *repositories.NotifikasiRepository
+	UserRepo       *repositories.UserRepository
 }
 
 func NewKehadiranService(
 	kehadiranRepo *repositories.KehadiranRepository,
 	peminjamanRepo *repositories.PeminjamanRepository,
 	logRepo *repositories.LogAktivitasRepository,
+	notifikasiRepo *repositories.NotifikasiRepository,
+	userRepo *repositories.UserRepository,
 ) *KehadiranService {
 	return &KehadiranService{
 		KehadiranRepo:  kehadiranRepo,
 		PeminjamanRepo: peminjamanRepo,
 		LogRepo:        logRepo,
+		NotifikasiRepo: notifikasiRepo,
+		UserRepo:       userRepo,
 	}
 }
 
@@ -68,6 +76,29 @@ func (s *KehadiranService) CreateKehadiran(req *models.CreateKehadiranRequest, s
 		Keterangan:     "Status kehadiran: " + string(req.StatusKehadiran),
 	})
 
+	// Notify Sarpras staff about kehadiran verification
+	if s.NotifikasiRepo != nil && s.UserRepo != nil {
+		if sarprasUsers, err := s.UserRepo.GetByRole(models.RoleSarpras); err == nil && len(sarprasUsers) > 0 {
+			statusLabel := "diverifikasi"
+			if req.StatusKehadiran == models.KehadiranTidakHadir {
+				statusLabel = "tidak hadir"
+			} else if req.StatusKehadiran == models.KehadiranBatal {
+				statusLabel = "dibatalkan"
+			}
+
+			for _, sarpras := range sarprasUsers {
+				s.NotifikasiRepo.Create(&models.Notifikasi{
+					KodeNotifikasi:  generateCode("NTF"),
+					KodeUser:        sarpras.KodeUser,
+					KodePeminjaman:  &req.KodePeminjaman,
+					JenisNotifikasi: models.NotifKehadiranVerified,
+					Pesan:           fmt.Sprintf("Kehadiran peminjaman %s", statusLabel),
+					Status:          models.NotifikasiTerkirim,
+				})
+			}
+			log.Printf("📱 Kehadiran notification sent to %d Sarpras users", len(sarprasUsers))
+		}
+	}
+
 	return nil
 }
-

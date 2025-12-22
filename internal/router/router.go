@@ -49,6 +49,8 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		kehadiranRepo,
 		peminjamanRepo,
 		logRepo,
+		notifikasiRepo,
+		userRepo,
 	)
 	exportService := services.NewExportService()
 
@@ -195,7 +197,6 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.Handle("/api/laporan/peminjaman", withRole(http.HandlerFunc(peminjamanHandler.GetLaporan), "SARPRAS", "ADMIN"))
 	mux.Handle("/api/laporan/peminjaman/export", withRole(http.HandlerFunc(exportHandler.ExportPeminjamanToExcel), "SARPRAS", "ADMIN"))
 
-
 	// Protected routes - Kehadiran
 	mux.Handle("/api/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.Create), "SECURITY", "ADMIN"))
 	mux.Handle("/api/laporan/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.GetByPeminjamanID), "SARPRAS", "ADMIN", "SECURITY"))
@@ -204,6 +205,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	// Protected routes - Notifikasi
 	mux.Handle("/api/notifikasi/me", withAuth(http.HandlerFunc(notifikasiHandler.GetMyNotifikasi)))
 	mux.Handle("/api/notifikasi/count", withAuth(http.HandlerFunc(notifikasiHandler.GetUnreadCount)))
+	mux.Handle("/api/notifikasi/dibaca-semua", withAuth(http.HandlerFunc(notifikasiHandler.MarkAllAsRead)))
 	mux.HandleFunc("/api/notifikasi/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if len(path) > len("/api/notifikasi/") {

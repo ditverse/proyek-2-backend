@@ -345,6 +345,21 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 			}
 		}
 
+		// 4. Create in-app notification for Security
+		if securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity); err == nil && len(securityUsers) > 0 {
+			for _, security := range securityUsers {
+				s.NotifikasiRepo.Create(&models.Notifikasi{
+					KodeNotifikasi:  generateCode("NTF"),
+					KodeUser:        security.KodeUser,
+					KodePeminjaman:  &kodePeminjaman,
+					JenisNotifikasi: models.NotifInfoKegiatan,
+					Pesan:           fmt.Sprintf("Kegiatan baru disetujui: %s di %s", namaKegiatan, namaRuangan),
+					Status:          models.NotifikasiTerkirim,
+				})
+			}
+			log.Printf("📱 In-app notification sent to %d security users", len(securityUsers))
+		}
+
 	} else if req.Status == models.StatusPeminjamanRejected {
 		// ===== REJECTED: Email to Mahasiswa =====
 		if s.EmailService != nil && s.EmailService.IsConfigured() && peminjam.Email != "" {

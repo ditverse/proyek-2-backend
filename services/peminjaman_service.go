@@ -38,6 +38,12 @@ func NewPeminjamanService(
 }
 
 func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest, kodeUser string) (*models.Peminjaman, error) {
+	// VALIDASI 1: Jam Submit (Request Time)
+	// Mahasiswa/user hanya boleh submit pengajuan pada hari kerja (Senin-Jumat) jam 07:00-17:00 WIB
+	if err := ValidateSubmissionTime(); err != nil {
+		return nil, err
+	}
+
 	// Backward compatibility: support both old (surat_digital_url) and new (path_surat_digital) field names
 	suratPath := req.PathSuratDigital
 	if suratPath == "" && req.SuratDigitalURL != "" {
@@ -63,6 +69,13 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 
 	if tanggalSelesai.Before(tanggalMulai) {
 		return nil, errors.New("tanggal_selesai harus setelah tanggal_mulai")
+	}
+
+	// VALIDASI 2: Waktu Peminjaman (Rental Period)
+	// Waktu peminjaman harus dalam range Senin-Sabtu, jam 07:00-17:00 WIB
+	// Tidak boleh ada Minggu di antara periode peminjaman
+	if err := ValidateRentalPeriod(tanggalMulai, tanggalSelesai); err != nil {
+		return nil, err
 	}
 
 	for _, item := range req.Barang {

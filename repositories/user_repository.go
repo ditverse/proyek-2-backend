@@ -15,17 +15,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (nama, email, password_hash, role, organisasi_kode, no_hp)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO users (nama, email, password_hash, role, organisasi_kode)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING kode_user, created_at
 	`
 	var orgKode interface{}
 	if user.OrganisasiKode != nil {
 		orgKode = *user.OrganisasiKode
-	}
-	var noHP interface{}
-	if user.NoHP != nil {
-		noHP = *user.NoHP
 	}
 	err := r.DB.QueryRow(
 		query,
@@ -34,7 +30,6 @@ func (r *UserRepository) Create(user *models.User) error {
 		user.PasswordHash,
 		user.Role,
 		orgKode,
-		noHP,
 	).Scan(&user.KodeUser, &user.CreatedAt)
 	return err
 }
@@ -42,12 +37,11 @@ func (r *UserRepository) Create(user *models.User) error {
 func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT kode_user, nama, email, password_hash, role, organisasi_kode, no_hp, created_at
+		SELECT kode_user, nama, email, password_hash, role, organisasi_kode, created_at
 		FROM users
 		WHERE email = $1
 	`
 	var orgKode sql.NullString
-	var noHP sql.NullString
 	err := r.DB.QueryRow(query, email).Scan(
 		&user.KodeUser,
 		&user.Nama,
@@ -55,14 +49,10 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 		&user.PasswordHash,
 		&user.Role,
 		&orgKode,
-		&noHP,
 		&user.CreatedAt,
 	)
 	if orgKode.Valid {
 		user.OrganisasiKode = &orgKode.String
-	}
-	if noHP.Valid {
-		user.NoHP = &noHP.String
 	}
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -73,12 +63,11 @@ func (r *UserRepository) GetByEmail(email string) (*models.User, error) {
 func (r *UserRepository) GetByID(kodeUser string) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT kode_user, nama, email, password_hash, role, organisasi_kode, no_hp, created_at
+		SELECT kode_user, nama, email, password_hash, role, organisasi_kode, created_at
 		FROM users
 		WHERE kode_user = $1
 	`
 	var orgKode sql.NullString
-	var noHP sql.NullString
 	err := r.DB.QueryRow(query, kodeUser).Scan(
 		&user.KodeUser,
 		&user.Nama,
@@ -86,14 +75,10 @@ func (r *UserRepository) GetByID(kodeUser string) (*models.User, error) {
 		&user.PasswordHash,
 		&user.Role,
 		&orgKode,
-		&noHP,
 		&user.CreatedAt,
 	)
 	if orgKode.Valid {
 		user.OrganisasiKode = &orgKode.String
-	}
-	if noHP.Valid {
-		user.NoHP = &noHP.String
 	}
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -103,7 +88,7 @@ func (r *UserRepository) GetByID(kodeUser string) (*models.User, error) {
 
 func (r *UserRepository) GetByRole(role models.RoleEnum) ([]models.User, error) {
 	query := `
-		SELECT kode_user, nama, email, role, organisasi_kode, no_hp, created_at
+		SELECT kode_user, nama, email, role, organisasi_kode, created_at
 		FROM users
 		WHERE role = $1
 		ORDER BY nama
@@ -118,14 +103,12 @@ func (r *UserRepository) GetByRole(role models.RoleEnum) ([]models.User, error) 
 	for rows.Next() {
 		var u models.User
 		var orgKode sql.NullString
-		var noHP sql.NullString
 		err := rows.Scan(
 			&u.KodeUser,
 			&u.Nama,
 			&u.Email,
 			&u.Role,
 			&orgKode,
-			&noHP,
 			&u.CreatedAt,
 		)
 		if err != nil {
@@ -134,10 +117,8 @@ func (r *UserRepository) GetByRole(role models.RoleEnum) ([]models.User, error) 
 		if orgKode.Valid {
 			u.OrganisasiKode = &orgKode.String
 		}
-		if noHP.Valid {
-			u.NoHP = &noHP.String
-		}
 		users = append(users, u)
 	}
 	return users, nil
 }
+

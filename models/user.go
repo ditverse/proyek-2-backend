@@ -3,15 +3,14 @@ package models
 import "time"
 
 type User struct {
-	KodeUser       string      `json:"kode_user"`
-	Nama           string      `json:"nama"`
-	Email          string      `json:"email"`
-	PasswordHash   string      `json:"-"` // tidak di-expose ke JSON
-	Role           RoleEnum    `json:"role"`
-	NoHP           *string     `json:"no_hp"`
-	OrganisasiKode *string     `json:"organisasi_kode"`
-	Organisasi     *Organisasi `json:"organisasi,omitempty"`
-	CreatedAt      time.Time   `json:"created_at"`
+	KodeUser       string       `json:"kode_user"`
+	Nama           string       `json:"nama"`
+	Email          string       `json:"email"`
+	PasswordHash   string       `json:"-"` // tidak di-expose ke JSON
+	Role           RoleEnum     `json:"role"`
+	OrganisasiKode *string      `json:"organisasi_kode"`
+	Organisasi     *Organisasi  `json:"organisasi,omitempty"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 type LoginRequest struct {

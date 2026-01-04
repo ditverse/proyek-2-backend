@@ -96,7 +96,7 @@ func (h *KehadiranHandler) GetRiwayatBySecurity(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get optional date filters from query params
+	// 1. Get optional date filters
 	start := r.URL.Query().Get("start")
 	end := r.URL.Query().Get("end")
 	
@@ -108,50 +108,107 @@ func (h *KehadiranHandler) GetRiwayatBySecurity(w http.ResponseWriter, r *http.R
 		endPtr = &end
 	}
 
-	// Get kehadiran data from repository
+	// 2. Fetch main list (Kehadiran)
 	kehadiranList, err := h.KehadiranRepo.GetRiwayat(startPtr, endPtr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	
+	if len(kehadiranList) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(kehadiranList)
+		return
+	}
 
-	// Enrich each kehadiran with Peminjaman, Peminjam, Ruangan, Kegiatan, Verifier
+	// 3. Collect IDs for batch fetching
+	peminjamanIDs := make([]string, 0)
+	verifierIDs := make([]string, 0)
+	verifierSet := make(map[string]bool)
+
+	for _, k := range kehadiranList {
+		peminjamanIDs = append(peminjamanIDs, k.KodePeminjaman)
+		
+		if k.DiverifikasiOleh != nil && !verifierSet[*k.DiverifikasiOleh] {
+			verifierIDs = append(verifierIDs, *k.DiverifikasiOleh)
+			verifierSet[*k.DiverifikasiOleh] = true
+		}
+	}
+
+	// 4. Batch Load: Peminjaman & Verifiers
+	peminjamanMap, err := h.PeminjamanRepo.GetByIDs(peminjamanIDs)
+	if err != nil {
+		http.Error(w, "Error loading peminjaman data", http.StatusInternalServerError)
+		return
+	}
+	
+	verifierMap := h.UserRepo.GetByIDs(verifierIDs)
+
+	// 5. Collect related IDs from fetched Peminjaman
+	userIDs := make([]string, 0)      // Peminjam
+	ruanganIDs := make([]string, 0)
+	kegiatanIDs := make([]string, 0)
+	
+	userSet := make(map[string]bool)
+	ruanganSet := make(map[string]bool)
+	kegiatanSet := make(map[string]bool)
+
+	for _, p := range peminjamanMap {
+		if !userSet[p.KodeUser] {
+			userIDs = append(userIDs, p.KodeUser)
+			userSet[p.KodeUser] = true
+		}
+		if p.KodeRuangan != nil && !ruanganSet[*p.KodeRuangan] {
+			ruanganIDs = append(ruanganIDs, *p.KodeRuangan)
+			ruanganSet[*p.KodeRuangan] = true
+		}
+		if p.KodeKegiatan != nil && !kegiatanSet[*p.KodeKegiatan] {
+			kegiatanIDs = append(kegiatanIDs, *p.KodeKegiatan)
+			kegiatanSet[*p.KodeKegiatan] = true
+		}
+	}
+
+	// 6. Batch Load: User (Peminjam), Ruangan, Kegiatan
+	userMap := h.UserRepo.GetByIDs(userIDs)
+	ruanganMap := h.RuanganRepo.GetByIDs(ruanganIDs)
+	kegiatanMap := h.KegiatanRepo.GetByIDs(kegiatanIDs)
+
+	// 7. Assemble Data (In-Memory Association)
 	for i := range kehadiranList {
-		// Get Peminjaman data
-		peminjaman, err := h.PeminjamanRepo.GetByID(kehadiranList[i].KodePeminjaman)
-		if err == nil && peminjaman != nil {
-			// Get Peminjam (User)
-			if peminjaman.KodeUser != "" {
-				peminjam, err := h.UserRepo.GetByID(peminjaman.KodeUser)
-				if err == nil && peminjam != nil {
-					peminjaman.Peminjam = peminjam
-				}
+		// Link Peminjaman
+		if peminjaman, ok := peminjamanMap[kehadiranList[i].KodePeminjaman]; ok {
+			// Deep copy to avoid sharing references if needed, but here we just need to link
+			// We need to construct a new object or modify the map value (which is a pointer)
+			// But since we want to attach related objects to Peminjaman struct, better to use value copy if modifying
+			
+			// Link Peminjam (User)
+			if peminjam, ok := userMap[peminjaman.KodeUser]; ok {
+				peminjam.PasswordHash = "" // Safety
+				peminjaman.Peminjam = peminjam
 			}
 			
-			// Get Ruangan
+			// Link Ruangan
 			if peminjaman.KodeRuangan != nil {
-				ruangan, err := h.RuanganRepo.GetByID(*peminjaman.KodeRuangan)
-				if err == nil && ruangan != nil {
-					peminjaman.Ruangan = ruangan
+				if r, ok := ruanganMap[*peminjaman.KodeRuangan]; ok {
+					peminjaman.Ruangan = r
 				}
 			}
 			
-			// Get Kegiatan
+			// Link Kegiatan
 			if peminjaman.KodeKegiatan != nil {
-				kegiatan, err := h.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan)
-				if err == nil && kegiatan != nil {
-					peminjaman.Kegiatan = kegiatan
+				if k, ok := kegiatanMap[*peminjaman.KodeKegiatan]; ok {
+					peminjaman.Kegiatan = k
 				}
 			}
 			
 			kehadiranList[i].Peminjaman = peminjaman
 		}
 		
-		// Get Verifier (Security user who verified)
+		// Link Verifier
 		if kehadiranList[i].DiverifikasiOleh != nil {
-			verifier, err := h.UserRepo.GetByID(*kehadiranList[i].DiverifikasiOleh)
-			if err == nil && verifier != nil {
-				kehadiranList[i].Verifier = verifier
+			if v, ok := verifierMap[*kehadiranList[i].DiverifikasiOleh]; ok {
+				v.PasswordHash = ""
+				kehadiranList[i].Verifier = v
 			}
 		}
 	}

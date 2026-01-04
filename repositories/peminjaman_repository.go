@@ -3,6 +3,8 @@ package repositories
 import (
 	"backend-sarpras/models"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -294,7 +296,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 		LEFT JOIN organisasi o ON u.organisasi_kode = o.kode_organisasi
 		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
 		WHERE p.kode_ruangan IS NOT NULL
-		  AND p.status = 'APPROVED'
+		  AND p.status IN ('APPROVED', 'PENDING')
 		  AND p.tanggal_mulai <= $2
 		  AND p.tanggal_selesai >= $1
 		ORDER BY p.tanggal_mulai
@@ -527,4 +529,86 @@ func (r *PeminjamanRepository) GetPeminjamanBarangBatch(kodePeminjamans []string
 		result[kodePeminjaman] = append(result[kodePeminjaman], item)
 	}
 	return result
+}
+
+func (r *PeminjamanRepository) GetByIDs(ids []string) (map[string]*models.Peminjaman, error) {
+	if len(ids) == 0 {
+		return make(map[string]*models.Peminjaman), nil
+	}
+
+	// Create placeholders for IN clause ($1, $2, ...)
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, 
+		       tanggal_mulai, tanggal_selesai, status, path_surat_digital,
+		       verified_by, verified_at, catatan_verifikasi, created_at, updated_at
+		FROM peminjaman
+		WHERE kode_peminjaman IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]*models.Peminjaman)
+	
+	// Reuse logic from scanRows but adapt for loop
+	for rows.Next() {
+		var p models.Peminjaman
+		var pathSurat, kodeRuangan, kodeKegiatan, verifiedBy, catatan sql.NullString
+		var verifiedAt, updatedAt sql.NullTime
+
+		err := rows.Scan(
+			&p.KodePeminjaman,
+			&p.KodeUser,
+			&kodeRuangan,
+			&kodeKegiatan,
+			&p.TanggalMulai,
+			&p.TanggalSelesai,
+			&p.Status,
+			&pathSurat,
+			&verifiedBy,
+			&verifiedAt,
+			&catatan,
+			&p.CreatedAt,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if pathSurat.Valid {
+			p.PathSuratDigital = pathSurat.String
+		}
+		if kodeRuangan.Valid {
+			p.KodeRuangan = &kodeRuangan.String
+		}
+		if kodeKegiatan.Valid {
+			p.KodeKegiatan = &kodeKegiatan.String
+		}
+		if verifiedBy.Valid {
+			p.VerifiedBy = &verifiedBy.String
+		}
+		if verifiedAt.Valid {
+			p.VerifiedAt = &verifiedAt.Time
+		}
+		if updatedAt.Valid {
+			p.UpdatedAt = &updatedAt.Time
+		}
+		if catatan.Valid {
+			p.CatatanVerifikasi = catatan.String
+		}
+		
+		result[p.KodePeminjaman] = &p
+	}
+	
+	return result, nil
 }

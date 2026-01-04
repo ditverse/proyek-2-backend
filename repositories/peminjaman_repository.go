@@ -91,7 +91,7 @@ func (r *PeminjamanRepository) GetByID(kodePeminjaman string) (*models.Peminjama
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if kodeRuangan.Valid {
 		p.KodeRuangan = &kodeRuangan.String
 	}
@@ -462,4 +462,54 @@ func (r *PeminjamanRepository) UpdateSuratDigitalURL(kodePeminjaman string, path
 	`
 	_, err := r.DB.Exec(query, path, kodePeminjaman)
 	return err
+}
+
+// GetPeminjamanBarangBatch returns a map of peminjaman barang keyed by kode_peminjaman for batch loading
+func (r *PeminjamanRepository) GetPeminjamanBarangBatch(kodePeminjamans []string) map[string][]models.PeminjamanBarangDetail {
+	result := make(map[string][]models.PeminjamanBarangDetail)
+	if len(kodePeminjamans) == 0 {
+		return result
+	}
+
+	query := `
+		SELECT pb.kode_peminjaman, pb.kode_peminjaman_barang, pb.kode_barang, pb.jumlah,
+		       b.kode_barang, b.nama_barang, b.deskripsi, b.jumlah_total, b.ruangan_kode
+		FROM peminjaman_barang pb
+		JOIN barang b ON pb.kode_barang = b.kode_barang
+		WHERE pb.kode_peminjaman = ANY($1)
+	`
+	rows, err := r.DB.Query(query, kodePeminjamans)
+	if err != nil {
+		return result
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			kodePeminjaman string
+			item           models.PeminjamanBarangDetail
+			barang         models.Barang
+			ruanganKode    sql.NullString
+		)
+		err := rows.Scan(
+			&kodePeminjaman,
+			&item.KodePeminjamanBarang,
+			&item.KodeBarang,
+			&item.Jumlah,
+			&barang.KodeBarang,
+			&barang.NamaBarang,
+			&barang.Deskripsi,
+			&barang.JumlahTotal,
+			&ruanganKode,
+		)
+		if err != nil {
+			continue
+		}
+		if ruanganKode.Valid {
+			barang.RuanganKode = &ruanganKode.String
+		}
+		item.Barang = &barang
+		result[kodePeminjaman] = append(result[kodePeminjaman], item)
+	}
+	return result
 }

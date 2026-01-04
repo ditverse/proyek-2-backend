@@ -87,3 +87,33 @@ func (r *RuanganRepository) Delete(kodeRuangan string) error {
 	return err
 }
 
+// GetByIDs returns a map of ruangan keyed by kode_ruangan for batch loading
+func (r *RuanganRepository) GetByIDs(kodes []string) map[string]*models.Ruangan {
+	result := make(map[string]*models.Ruangan)
+	if len(kodes) == 0 {
+		return result
+	}
+
+	query := `SELECT kode_ruangan, nama_ruangan, lokasi, kapasitas, deskripsi 
+			  FROM ruangan WHERE kode_ruangan = ANY($1)`
+	rows, err := r.DB.Query(query, kodes)
+	if err != nil {
+		return result
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		ruangan := &models.Ruangan{}
+		err := rows.Scan(
+			&ruangan.KodeRuangan,
+			&ruangan.NamaRuangan,
+			&ruangan.Lokasi,
+			&ruangan.Kapasitas,
+			&ruangan.Deskripsi,
+		)
+		if err == nil {
+			result[ruangan.KodeRuangan] = ruangan
+		}
+	}
+	return result
+}

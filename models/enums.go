@@ -47,8 +47,6 @@ const (
 	NotifStatusRejected    NotifikasiJenisEnum = "STATUS_REJECTED"
 	NotifReminderKehadiran NotifikasiJenisEnum = "REMINDER_KEHADIRAN"
 	NotifReminder1Jam      NotifikasiJenisEnum = "REMINDER_1JAM"
-	NotifInfoKegiatan      NotifikasiJenisEnum = "INFO_KEGIATAN"
-	NotifKehadiranVerified NotifikasiJenisEnum = "KEHADIRAN_DIVERIFIKASI"
 )
 
 // KehadiranStatusEnum mengikuti enum kehadiran_status_enum di database.

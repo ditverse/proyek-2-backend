@@ -92,13 +92,3 @@ func (r *NotifikasiRepository) MarkAsRead(kodeNotifikasi string, kodeUser string
 	return err
 }
 
-func (r *NotifikasiRepository) MarkAllAsRead(kodeUser string) error {
-	query := `
-		UPDATE notifikasi
-		SET status = 'DIBACA',
-		    updated_at = NOW()
-		WHERE kode_user = $1 AND status = 'TERKIRIM'
-	`
-	_, err := r.DB.Exec(query, kodeUser)
-	return err
-}

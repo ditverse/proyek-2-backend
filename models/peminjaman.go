@@ -51,6 +51,11 @@ type VerifikasiPeminjamanRequest struct {
 	CatatanVerifikasi string               `json:"catatan_verifikasi"`
 }
 
+type KegiatanSimple struct {
+	KodeKegiatan string `json:"kode_kegiatan"`
+	NamaKegiatan string `json:"nama_kegiatan"`
+}
+
 type JadwalRuanganResponse struct {
 	KodePeminjaman string               `json:"kode_peminjaman"`
 	KodeRuangan    string               `json:"kode_ruangan"`
@@ -60,4 +65,5 @@ type JadwalRuanganResponse struct {
 	Status         PeminjamanStatusEnum `json:"status"`
 	Peminjam       string               `json:"peminjam"`
 	Organisasi     string               `json:"organisasi"`
+	Kegiatan       *KegiatanSimple      `json:"kegiatan,omitempty"`
 }

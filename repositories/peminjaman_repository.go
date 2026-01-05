@@ -286,13 +286,11 @@ func (r *PeminjamanRepository) GetPending() ([]models.Peminjaman, error) {
 func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.JadwalRuanganResponse, error) {
 	query := `
 		SELECT p.kode_peminjaman, p.kode_ruangan, r.nama_ruangan, p.tanggal_mulai, p.tanggal_selesai,
-		       p.status, u.nama, COALESCE(o.nama, '') as nama_organisasi,
-		       k.kode_kegiatan, k.nama_kegiatan
+		       p.status, u.nama, COALESCE(o.nama, '') as nama_organisasi
 		FROM peminjaman p
 		JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
 		JOIN users u ON p.kode_user = u.kode_user
 		LEFT JOIN organisasi o ON u.organisasi_kode = o.kode_organisasi
-		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
 		WHERE p.kode_ruangan IS NOT NULL
 		  AND p.status = 'APPROVED'
 		  AND p.tanggal_mulai <= $2
@@ -308,8 +306,6 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 	var jadwal []models.JadwalRuanganResponse
 	for rows.Next() {
 		var j models.JadwalRuanganResponse
-		var kodeKegiatan, namaKegiatan sql.NullString
-		
 		err := rows.Scan(
 			&j.KodePeminjaman,
 			&j.KodeRuangan,
@@ -319,21 +315,10 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 			&j.Status,
 			&j.Peminjam,
 			&j.Organisasi,
-			&kodeKegiatan,
-			&namaKegiatan,
 		)
 		if err != nil {
 			return nil, err
 		}
-		
-		// Populate kegiatan jika tidak NULL
-		if kodeKegiatan.Valid && namaKegiatan.Valid {
-			j.Kegiatan = &models.KegiatanSimple{
-				KodeKegiatan: kodeKegiatan.String,
-				NamaKegiatan: namaKegiatan.String,
-			}
-		}
-		
 		jadwal = append(jadwal, j)
 	}
 	if jadwal == nil {

@@ -2,10 +2,6 @@
 
 > Backend API untuk sistem peminjaman ruangan dan barang kampus dengan role-based access control
 
-**Studi Kasus**: Universitas Logistik dan Bisnis Internasional (ULBI)  
-**Lokasi**: Jl. Sariasih No.54, Sarijadi, Kec. Sukasari, Kota Bandung, Jawa Barat 40151  
-**Timezone**: WIB (Asia/Jakarta, UTC+7)
-
 [![Go Version](https://img.shields.io/badge/Go-1.25.3-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?style=flat&logo=postgresql)](https://supabase.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)

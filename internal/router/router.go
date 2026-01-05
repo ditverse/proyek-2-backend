@@ -104,6 +104,18 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	// Protected routes - Ruangan
 	mux.Handle("/api/ruangan", corsMiddleware(http.HandlerFunc(ruanganHandler.GetAll)))
 	mux.Handle("/api/ruangan/", corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// Handle /api/ruangan/{kode}/booked-dates endpoint
+		if strings.HasSuffix(path, "/booked-dates") {
+			if r.Method == http.MethodGet {
+				peminjamanHandler.GetBookedDates(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
 		switch r.Method {
 		case http.MethodGet:
 			ruanganHandler.GetByID(w, r)
@@ -187,7 +199,6 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.Handle("/api/jadwal-aktif-belum-verifikasi", withRole(http.HandlerFunc(peminjamanHandler.GetJadwalAktifBelumVerifikasi), "SECURITY", "ADMIN"))
 	mux.Handle("/api/laporan/peminjaman", withRole(http.HandlerFunc(peminjamanHandler.GetLaporan), "SARPRAS", "ADMIN"))
 	mux.Handle("/api/laporan/peminjaman/export", withRole(http.HandlerFunc(exportHandler.ExportPeminjamanToExcel), "SARPRAS", "ADMIN"))
-
 
 	// Protected routes - Kehadiran
 	mux.Handle("/api/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.Create), "SECURITY", "ADMIN"))

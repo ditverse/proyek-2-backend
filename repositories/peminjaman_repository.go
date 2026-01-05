@@ -463,3 +463,62 @@ func (r *PeminjamanRepository) UpdateSuratDigitalURL(kodePeminjaman string, path
 	_, err := r.DB.Exec(query, path, kodePeminjaman)
 	return err
 }
+
+// IsRoomAvailable mengecek apakah ruangan tersedia pada rentang waktu tertentu
+// Ruangan dianggap tidak tersedia jika ada peminjaman dengan status PENDING atau APPROVED
+// yang waktunya overlap dengan rentang waktu yang diminta
+func (r *PeminjamanRepository) IsRoomAvailable(kodeRuangan string, mulai, selesai time.Time) (bool, error) {
+	query := `
+		SELECT COUNT(*) FROM peminjaman 
+		WHERE kode_ruangan = $1 
+		  AND status IN ('PENDING', 'APPROVED')
+		  AND tanggal_mulai < $3 
+		  AND tanggal_selesai > $2
+	`
+	var count int
+	err := r.DB.QueryRow(query, kodeRuangan, mulai, selesai).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
+// BookedDateInfo menyimpan informasi tanggal yang sudah dibooking
+type BookedDateInfo struct {
+	TanggalMulai   time.Time `json:"tanggal_mulai"`
+	TanggalSelesai time.Time `json:"tanggal_selesai"`
+	Status         string    `json:"status"`
+}
+
+// GetBookedDates mendapatkan daftar rentang waktu yang sudah dibooking untuk ruangan tertentu
+// dalam rentang waktu yang diminta
+func (r *PeminjamanRepository) GetBookedDates(kodeRuangan string, startRange, endRange time.Time) ([]BookedDateInfo, error) {
+	query := `
+		SELECT tanggal_mulai, tanggal_selesai, status
+		FROM peminjaman 
+		WHERE kode_ruangan = $1 
+		  AND status IN ('PENDING', 'APPROVED')
+		  AND tanggal_mulai <= $3 
+		  AND tanggal_selesai >= $2
+		ORDER BY tanggal_mulai
+	`
+	rows, err := r.DB.Query(query, kodeRuangan, startRange, endRange)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []BookedDateInfo
+	for rows.Next() {
+		var info BookedDateInfo
+		if err := rows.Scan(&info.TanggalMulai, &info.TanggalSelesai, &info.Status); err != nil {
+			return nil, err
+		}
+		result = append(result, info)
+	}
+	if result == nil {
+		result = []BookedDateInfo{}
+	}
+	return result, nil
+}
+

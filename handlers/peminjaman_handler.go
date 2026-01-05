@@ -619,6 +619,77 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(peminjaman)
 }
 
+// GetBookedDates mengembalikan daftar tanggal yang sudah dibooking untuk ruangan tertentu
+// GET /api/ruangan/{kode}/booked-dates?start=...&end=...
+func (h *PeminjamanHandler) GetBookedDates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract kode_ruangan dari URL path: /api/ruangan/{kode}/booked-dates
+	path := strings.TrimSuffix(r.URL.Path, "/booked-dates")
+	segments := strings.Split(strings.Trim(path, "/"), "/")
+	var kodeRuangan string
+	for i := 0; i < len(segments); i++ {
+		if segments[i] == "ruangan" && i+1 < len(segments) {
+			kodeRuangan = segments[i+1]
+			break
+		}
+	}
+
+	if kodeRuangan == "" {
+		http.Error(w, "Kode ruangan tidak valid", http.StatusBadRequest)
+		return
+	}
+
+	// Parse range parameters
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+
+	var start, end time.Time
+	var err error
+
+	if startStr == "" {
+		start = time.Now()
+	} else {
+		start, err = time.Parse("2006-01-02", startStr)
+		if err != nil {
+			// Try RFC3339 format
+			start, err = time.Parse(time.RFC3339, startStr)
+			if err != nil {
+				http.Error(w, "Format tanggal start tidak valid (gunakan YYYY-MM-DD)", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
+	if endStr == "" {
+		end = time.Now().AddDate(0, 0, 14) // Default 2 minggu ke depan
+	} else {
+		end, err = time.Parse("2006-01-02", endStr)
+		if err != nil {
+			// Try RFC3339 format
+			end, err = time.Parse(time.RFC3339, endStr)
+			if err != nil {
+				http.Error(w, "Format tanggal end tidak valid (gunakan YYYY-MM-DD)", http.StatusBadRequest)
+				return
+			}
+		}
+		// Set end to end of day
+		end = end.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+
+	bookedDates, err := h.PeminjamanRepo.GetBookedDates(kodeRuangan, start, end)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(bookedDates)
+}
+
 func extractKodePeminjaman(path string) (string, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {

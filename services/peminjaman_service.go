@@ -65,6 +65,23 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 		return nil, errors.New("tanggal_selesai harus setelah tanggal_mulai")
 	}
 
+	// Validasi: Booking tidak boleh lebih dari 2 minggu ke depan dari hari ini
+	maxBookingDate := time.Now().AddDate(0, 0, 14) // 14 hari = 2 minggu
+	if tanggalMulai.After(maxBookingDate) {
+		return nil, errors.New("booking hanya bisa dilakukan maksimal 2 minggu sebelum tanggal acara")
+	}
+
+	// Validasi: Cek apakah ruangan sudah dibooking pada waktu tersebut (mencegah bentrok)
+	if req.KodeRuangan != nil && *req.KodeRuangan != "" {
+		isAvailable, err := s.PeminjamanRepo.IsRoomAvailable(*req.KodeRuangan, tanggalMulai, tanggalSelesai)
+		if err != nil {
+			return nil, errors.New("gagal mengecek ketersediaan ruangan")
+		}
+		if !isAvailable {
+			return nil, errors.New("ruangan sudah dibooking pada waktu tersebut, silakan pilih waktu lain")
+		}
+	}
+
 	for _, item := range req.Barang {
 		barang, err := s.BarangRepo.GetByID(item.KodeBarang)
 		if err != nil {

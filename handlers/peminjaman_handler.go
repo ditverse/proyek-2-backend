@@ -41,91 +41,6 @@ func NewPeminjamanHandler(
 	}
 }
 
-// enrichPeminjamanList enriches a list of peminjaman with related data using batch queries
-// This eliminates N+1 query problem by using batch loading instead of individual queries
-func (h *PeminjamanHandler) enrichPeminjamanList(peminjaman []models.Peminjaman, includeBarang bool, includeOrganisasi bool) {
-	if len(peminjaman) == 0 {
-		return
-	}
-
-	// Collect unique IDs
-	ruanganIDs := make([]string, 0)
-	kegiatanIDs := make([]string, 0)
-	userIDs := make([]string, 0)
-	peminjamanIDs := make([]string, 0)
-
-	ruanganSet := make(map[string]bool)
-	kegiatanSet := make(map[string]bool)
-	userSet := make(map[string]bool)
-
-	for _, p := range peminjaman {
-		if p.KodeRuangan != nil && !ruanganSet[*p.KodeRuangan] {
-			ruanganIDs = append(ruanganIDs, *p.KodeRuangan)
-			ruanganSet[*p.KodeRuangan] = true
-		}
-		if p.KodeKegiatan != nil && !kegiatanSet[*p.KodeKegiatan] {
-			kegiatanIDs = append(kegiatanIDs, *p.KodeKegiatan)
-			kegiatanSet[*p.KodeKegiatan] = true
-		}
-		if !userSet[p.KodeUser] {
-			userIDs = append(userIDs, p.KodeUser)
-			userSet[p.KodeUser] = true
-		}
-		peminjamanIDs = append(peminjamanIDs, p.KodePeminjaman)
-	}
-
-	// Batch load all related data (1 query each instead of N queries)
-	ruanganMap := h.RuanganRepo.GetByIDs(ruanganIDs)
-	kegiatanMap := h.KegiatanRepo.GetByIDs(kegiatanIDs)
-	userMap := h.UserRepo.GetByIDs(userIDs)
-
-	var barangMap map[string][]models.PeminjamanBarangDetail
-	if includeBarang {
-		barangMap = h.PeminjamanRepo.GetPeminjamanBarangBatch(peminjamanIDs)
-	}
-
-	// Load organisasi if needed
-	var organisasiMap map[string]*models.Organisasi
-	if includeOrganisasi {
-		orgIDs := make([]string, 0)
-		orgSet := make(map[string]bool)
-		for _, u := range userMap {
-			if u.OrganisasiKode != nil && !orgSet[*u.OrganisasiKode] {
-				orgIDs = append(orgIDs, *u.OrganisasiKode)
-				orgSet[*u.OrganisasiKode] = true
-			}
-		}
-		organisasiMap = h.OrganisasiRepo.GetByIDs(orgIDs)
-	}
-
-	// Assign related data to each peminjaman
-	for i := range peminjaman {
-		if peminjaman[i].KodeRuangan != nil {
-			peminjaman[i].Ruangan = ruanganMap[*peminjaman[i].KodeRuangan]
-		}
-		if peminjaman[i].KodeKegiatan != nil {
-			peminjaman[i].Kegiatan = kegiatanMap[*peminjaman[i].KodeKegiatan]
-		}
-		if user := userMap[peminjaman[i].KodeUser]; user != nil {
-			user.PasswordHash = ""
-			if includeOrganisasi && user.OrganisasiKode != nil {
-				user.Organisasi = organisasiMap[*user.OrganisasiKode]
-			}
-			peminjaman[i].Peminjam = user
-		}
-		if includeBarang {
-			peminjaman[i].Barang = barangMap[peminjaman[i].KodePeminjaman]
-		}
-	}
-}
-
-// enrichSinglePeminjaman enriches a single peminjaman with related data
-func (h *PeminjamanHandler) enrichSinglePeminjaman(p *models.Peminjaman) {
-	list := []models.Peminjaman{*p}
-	h.enrichPeminjamanList(list, true, false)
-	*p = list[0]
-}
-
 func (h *PeminjamanHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -179,8 +94,22 @@ func (h *PeminjamanHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query
-	h.enrichSinglePeminjaman(peminjaman)
+	// Enrich dengan data relasi
+	if peminjaman.KodeRuangan != nil {
+		ruangan, _ := h.RuanganRepo.GetByID(*peminjaman.KodeRuangan)
+		peminjaman.Ruangan = ruangan
+	}
+	if peminjaman.KodeKegiatan != nil {
+		kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan)
+		peminjaman.Kegiatan = kegiatan
+	}
+	user, _ := h.UserRepo.GetByID(peminjaman.KodeUser)
+	if user != nil {
+		user.PasswordHash = ""
+		peminjaman.Peminjam = user
+	}
+	items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman.KodePeminjaman)
+	peminjaman.Barang = items
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)
@@ -204,8 +133,24 @@ func (h *PeminjamanHandler) GetMyPeminjaman(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query
-	h.enrichPeminjamanList(peminjaman, true, false)
+	// Enrich dengan data relasi
+	for i := range peminjaman {
+		if peminjaman[i].KodeRuangan != nil {
+			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
+			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
+		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
+		if user != nil {
+			user.PasswordHash = ""
+			peminjaman[i].Peminjam = user
+		}
+		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
+		peminjaman[i].Barang = items
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)
@@ -359,8 +304,24 @@ func (h *PeminjamanHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query
-	h.enrichPeminjamanList(peminjaman, true, false)
+	// Enrich dengan data relasi
+	for i := range peminjaman {
+		if peminjaman[i].KodeRuangan != nil {
+			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
+			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
+		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
+		if user != nil {
+			user.PasswordHash = ""
+			peminjaman[i].Peminjam = user
+		}
+		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
+		peminjaman[i].Barang = items
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)
@@ -482,8 +443,22 @@ func (h *PeminjamanHandler) GetJadwalAktif(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query (tanpa barang)
-	h.enrichPeminjamanList(peminjaman, false, false)
+	// Enrich dengan data relasi
+	for i := range peminjaman {
+		if peminjaman[i].KodeRuangan != nil {
+			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
+			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
+		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
+		if user != nil {
+			user.PasswordHash = ""
+			peminjaman[i].Peminjam = user
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)
@@ -527,8 +502,22 @@ func (h *PeminjamanHandler) GetJadwalAktifBelumVerifikasi(w http.ResponseWriter,
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query (tanpa barang)
-	h.enrichPeminjamanList(peminjaman, false, false)
+	// Enrich dengan data relasi
+	for i := range peminjaman {
+		if peminjaman[i].KodeRuangan != nil {
+			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
+			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
+		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
+		if user != nil {
+			user.PasswordHash = ""
+			peminjaman[i].Peminjam = user
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)
@@ -603,8 +592,28 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enrich dengan data relasi menggunakan batch query (dengan organisasi)
-	h.enrichPeminjamanList(peminjaman, true, true)
+	for i := range peminjaman {
+		if peminjaman[i].KodeRuangan != nil {
+			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
+			peminjaman[i].Ruangan = ruangan
+		}
+		if peminjaman[i].KodeKegiatan != nil {
+			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
+			peminjaman[i].Kegiatan = kegiatan
+		}
+		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
+		if user != nil {
+			user.PasswordHash = ""
+			// Load organisasi data jika user memiliki organisasi_kode
+			if user.OrganisasiKode != nil {
+				organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
+				user.Organisasi = organisasi
+			}
+			peminjaman[i].Peminjam = user
+		}
+		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
+		peminjaman[i].Barang = items
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(peminjaman)

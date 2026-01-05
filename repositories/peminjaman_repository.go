@@ -3,6 +3,8 @@ package repositories
 import (
 	"backend-sarpras/models"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -175,9 +177,11 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 		SELECT p.kode_peminjaman, p.kode_user, p.kode_ruangan, p.kode_kegiatan, p.tanggal_mulai, p.tanggal_selesai,
 		       p.status, p.path_surat_digital, p.verified_by, p.verified_at,
 		       p.catatan_verifikasi, p.created_at, p.updated_at,
-		       r.kode_ruangan, r.nama_ruangan, r.lokasi, r.kapasitas, r.deskripsi
+		       r.kode_ruangan, r.nama_ruangan, r.lokasi, r.kapasitas, r.deskripsi,
+		       k.kode_kegiatan, k.nama_kegiatan, k.deskripsi, k.tanggal_mulai, k.tanggal_selesai, k.organisasi_kode
 		FROM peminjaman p
 		LEFT JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
+		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
 		WHERE p.kode_user = $1
 		ORDER BY p.created_at DESC
 	`
@@ -204,6 +208,14 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 			rLokasi    sql.NullString
 			rKapasitas sql.NullInt32
 			rDeskripsi sql.NullString
+
+			// Kegiatan fields
+			kKode           sql.NullString
+			kNama           sql.NullString
+			kDeskripsi      sql.NullString
+			kTanggalMulai   sql.NullTime
+			kTanggalSelesai sql.NullTime
+			kOrganisasiKode sql.NullString
 		)
 		err := rows.Scan(
 			&row.KodePeminjaman,
@@ -224,6 +236,12 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 			&rLokasi,
 			&rKapasitas,
 			&rDeskripsi,
+			&kKode,
+			&kNama,
+			&kDeskripsi,
+			&kTanggalMulai,
+			&kTanggalSelesai,
+			&kOrganisasiKode,
 		)
 		if err != nil {
 			return nil, err
@@ -261,6 +279,18 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 			}
 		}
 
+		// Populate Kegiatan struct if data exists
+		if kKode.Valid {
+			row.Kegiatan = &models.Kegiatan{
+				KodeKegiatan:   kKode.String,
+				NamaKegiatan:   kNama.String,
+				Deskripsi:      kDeskripsi.String,
+				TanggalMulai:   kTanggalMulai.Time,
+				TanggalSelesai: kTanggalSelesai.Time,
+				OrganisasiKode: kOrganisasiKode.String,
+			}
+		}
+
 		result = append(result, row)
 	}
 	return result, nil
@@ -268,19 +298,154 @@ func (r *PeminjamanRepository) GetByPeminjamID(kodeUser string) ([]models.Peminj
 
 func (r *PeminjamanRepository) GetPending() ([]models.Peminjaman, error) {
 	query := `
-		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       status, path_surat_digital, verified_by, verified_at,
-		       catatan_verifikasi, created_at, updated_at
-		FROM peminjaman
-		WHERE status = 'PENDING'
-		ORDER BY created_at ASC
+		SELECT p.kode_peminjaman, p.kode_user, p.kode_ruangan, p.kode_kegiatan, p.tanggal_mulai, p.tanggal_selesai,
+		       p.status, p.path_surat_digital, p.verified_by, p.verified_at,
+		       p.catatan_verifikasi, p.created_at, p.updated_at,
+		       r.kode_ruangan, r.nama_ruangan, r.lokasi, r.kapasitas, r.deskripsi,
+		       k.kode_kegiatan, k.nama_kegiatan, k.deskripsi, k.tanggal_mulai, k.tanggal_selesai, k.organisasi_kode,
+		       u.kode_user, u.nama, u.email, u.role, u.organisasi_kode
+		FROM peminjaman p
+		LEFT JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
+		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
+		LEFT JOIN users u ON p.kode_user = u.kode_user
+		WHERE p.status = 'PENDING'
+		ORDER BY p.created_at ASC
 	`
 	rows, err := r.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+
+	var result []models.Peminjaman
+	for rows.Next() {
+		var (
+			row          models.Peminjaman
+			kodeRuangan  sql.NullString
+			kodeKegiatan sql.NullString
+			verifiedBy   sql.NullString
+			verifiedAt   sql.NullTime
+			catatan      sql.NullString
+			updatedAt    sql.NullTime
+
+			// Ruangan fields
+			rKode      sql.NullString
+			rNama      sql.NullString
+			rLokasi    sql.NullString
+			rKapasitas sql.NullInt32
+			rDeskripsi sql.NullString
+
+			// Kegiatan fields
+			kKode           sql.NullString
+			kNama           sql.NullString
+			kDeskripsi      sql.NullString
+			kTanggalMulai   sql.NullTime
+			kTanggalSelesai sql.NullTime
+			kOrganisasiKode sql.NullString
+
+			// User fields
+			uKode           sql.NullString
+			uNama           sql.NullString
+			uEmail          sql.NullString
+			uRole           sql.NullString
+			uOrganisasiKode sql.NullString
+		)
+		err := rows.Scan(
+			&row.KodePeminjaman,
+			&row.KodeUser,
+			&kodeRuangan,
+			&kodeKegiatan,
+			&row.TanggalMulai,
+			&row.TanggalSelesai,
+			&row.Status,
+			&row.PathSuratDigital,
+			&verifiedBy,
+			&verifiedAt,
+			&catatan,
+			&row.CreatedAt,
+			&updatedAt,
+			&rKode,
+			&rNama,
+			&rLokasi,
+			&rKapasitas,
+			&rDeskripsi,
+			&kKode,
+			&kNama,
+			&kDeskripsi,
+			&kTanggalMulai,
+			&kTanggalSelesai,
+			&kOrganisasiKode,
+			&uKode,
+			&uNama,
+			&uEmail,
+			&uRole,
+			&uOrganisasiKode,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if kodeRuangan.Valid {
+			row.KodeRuangan = &kodeRuangan.String
+		}
+		if kodeKegiatan.Valid {
+			row.KodeKegiatan = &kodeKegiatan.String
+		}
+		if verifiedBy.Valid {
+			row.VerifiedBy = &verifiedBy.String
+		}
+		if verifiedAt.Valid {
+			t := verifiedAt.Time
+			row.VerifiedAt = &t
+		}
+		if catatan.Valid {
+			row.CatatanVerifikasi = catatan.String
+		}
+		if updatedAt.Valid {
+			t := updatedAt.Time
+			row.UpdatedAt = &t
+		}
+
+		// Populate Ruangan struct if data exists
+		if rKode.Valid {
+			row.Ruangan = &models.Ruangan{
+				KodeRuangan: rKode.String,
+				NamaRuangan: rNama.String,
+				Lokasi:      rLokasi.String,
+				Kapasitas:   int(rKapasitas.Int32),
+				Deskripsi:   rDeskripsi.String,
+			}
+		}
+
+		// Populate Kegiatan struct if data exists
+		if kKode.Valid {
+			row.Kegiatan = &models.Kegiatan{
+				KodeKegiatan:   kKode.String,
+				NamaKegiatan:   kNama.String,
+				Deskripsi:      kDeskripsi.String,
+				TanggalMulai:   kTanggalMulai.Time,
+				TanggalSelesai: kTanggalSelesai.Time,
+				OrganisasiKode: kOrganisasiKode.String,
+			}
+		}
+
+		// Populate User (Peminjam) struct if data exists
+		if uKode.Valid {
+			peminjam := &models.User{
+				KodeUser: uKode.String,
+				Nama:     uNama.String,
+				Email:    uEmail.String,
+				Role:     models.RoleEnum(uRole.String),
+			}
+			if uOrganisasiKode.Valid {
+				peminjam.OrganisasiKode = &uOrganisasiKode.String
+			}
+			row.Peminjam = peminjam
+		}
+
+		result = append(result, row)
+	}
+	return result, nil
 }
 
 func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.JadwalRuanganResponse, error) {
@@ -431,25 +596,160 @@ func (r *PeminjamanRepository) GetPeminjamanBarang(kodePeminjaman string) ([]mod
 
 func (r *PeminjamanRepository) GetLaporan(start, end time.Time, status models.PeminjamanStatusEnum) ([]models.Peminjaman, error) {
 	query := `
-		SELECT kode_peminjaman, kode_user, kode_ruangan, kode_kegiatan, tanggal_mulai, tanggal_selesai,
-		       status, path_surat_digital, verified_by, verified_at,
-		       catatan_verifikasi, created_at, updated_at
-		FROM peminjaman
-		WHERE created_at >= $1 AND created_at <= $2
+		SELECT p.kode_peminjaman, p.kode_user, p.kode_ruangan, p.kode_kegiatan, p.tanggal_mulai, p.tanggal_selesai,
+		       p.status, p.path_surat_digital, p.verified_by, p.verified_at,
+		       p.catatan_verifikasi, p.created_at, p.updated_at,
+		       r.kode_ruangan, r.nama_ruangan, r.lokasi, r.kapasitas, r.deskripsi,
+		       k.kode_kegiatan, k.nama_kegiatan, k.deskripsi, k.tanggal_mulai, k.tanggal_selesai, k.organisasi_kode,
+		       u.kode_user, u.nama, u.email, u.role, u.organisasi_kode
+		FROM peminjaman p
+		LEFT JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
+		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
+		LEFT JOIN users u ON p.kode_user = u.kode_user
+		WHERE p.created_at >= $1 AND p.created_at <= $2
 	`
 	args := []interface{}{start, end}
 	if status != "" {
-		query += " AND status = $3"
+		query += " AND p.status = $3"
 		args = append(args, status)
 	}
-	query += " ORDER BY created_at DESC"
+	query += " ORDER BY p.created_at DESC"
 
 	rows, err := r.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return r.scanRows(rows)
+
+	var result []models.Peminjaman
+	for rows.Next() {
+		var (
+			row          models.Peminjaman
+			kodeRuangan  sql.NullString
+			kodeKegiatan sql.NullString
+			verifiedBy   sql.NullString
+			verifiedAt   sql.NullTime
+			catatan      sql.NullString
+			updatedAt    sql.NullTime
+
+			// Ruangan fields
+			rKode      sql.NullString
+			rNama      sql.NullString
+			rLokasi    sql.NullString
+			rKapasitas sql.NullInt32
+			rDeskripsi sql.NullString
+
+			// Kegiatan fields
+			kKode           sql.NullString
+			kNama           sql.NullString
+			kDeskripsi      sql.NullString
+			kTanggalMulai   sql.NullTime
+			kTanggalSelesai sql.NullTime
+			kOrganisasiKode sql.NullString
+
+			// User fields
+			uKode           sql.NullString
+			uNama           sql.NullString
+			uEmail          sql.NullString
+			uRole           sql.NullString
+			uOrganisasiKode sql.NullString
+		)
+		err := rows.Scan(
+			&row.KodePeminjaman,
+			&row.KodeUser,
+			&kodeRuangan,
+			&kodeKegiatan,
+			&row.TanggalMulai,
+			&row.TanggalSelesai,
+			&row.Status,
+			&row.PathSuratDigital,
+			&verifiedBy,
+			&verifiedAt,
+			&catatan,
+			&row.CreatedAt,
+			&updatedAt,
+			&rKode,
+			&rNama,
+			&rLokasi,
+			&rKapasitas,
+			&rDeskripsi,
+			&kKode,
+			&kNama,
+			&kDeskripsi,
+			&kTanggalMulai,
+			&kTanggalSelesai,
+			&kOrganisasiKode,
+			&uKode,
+			&uNama,
+			&uEmail,
+			&uRole,
+			&uOrganisasiKode,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if kodeRuangan.Valid {
+			row.KodeRuangan = &kodeRuangan.String
+		}
+		if kodeKegiatan.Valid {
+			row.KodeKegiatan = &kodeKegiatan.String
+		}
+		if verifiedBy.Valid {
+			row.VerifiedBy = &verifiedBy.String
+		}
+		if verifiedAt.Valid {
+			t := verifiedAt.Time
+			row.VerifiedAt = &t
+		}
+		if catatan.Valid {
+			row.CatatanVerifikasi = catatan.String
+		}
+		if updatedAt.Valid {
+			t := updatedAt.Time
+			row.UpdatedAt = &t
+		}
+
+		// Populate Ruangan struct if data exists
+		if rKode.Valid {
+			row.Ruangan = &models.Ruangan{
+				KodeRuangan: rKode.String,
+				NamaRuangan: rNama.String,
+				Lokasi:      rLokasi.String,
+				Kapasitas:   int(rKapasitas.Int32),
+				Deskripsi:   rDeskripsi.String,
+			}
+		}
+
+		// Populate Kegiatan struct if data exists
+		if kKode.Valid {
+			row.Kegiatan = &models.Kegiatan{
+				KodeKegiatan:   kKode.String,
+				NamaKegiatan:   kNama.String,
+				Deskripsi:      kDeskripsi.String,
+				TanggalMulai:   kTanggalMulai.Time,
+				TanggalSelesai: kTanggalSelesai.Time,
+				OrganisasiKode: kOrganisasiKode.String,
+			}
+		}
+
+		// Populate User (Peminjam) struct if data exists
+		if uKode.Valid {
+			peminjam := &models.User{
+				KodeUser: uKode.String,
+				Nama:     uNama.String,
+				Email:    uEmail.String,
+				Role:     models.RoleEnum(uRole.String),
+			}
+			if uOrganisasiKode.Valid {
+				peminjam.OrganisasiKode = &uOrganisasiKode.String
+			}
+			row.Peminjam = peminjam
+		}
+
+		result = append(result, row)
+	}
+	return result, nil
 }
 
 func (r *PeminjamanRepository) UpdateSuratDigitalURL(kodePeminjaman string, path string) error {
@@ -518,5 +818,66 @@ func (r *PeminjamanRepository) GetBookedDates(kodeRuangan string, startRange, en
 	if result == nil {
 		result = []BookedDateInfo{}
 	}
+	return result, nil
+}
+
+// GetPeminjamanBarangByIDs mengambil semua barang untuk multiple peminjaman sekaligus (batch query)
+// Returns a map where key is kode_peminjaman and value is slice of PeminjamanBarangDetail
+func (r *PeminjamanRepository) GetPeminjamanBarangByIDs(kodePeminjamanList []string) (map[string][]models.PeminjamanBarangDetail, error) {
+	result := make(map[string][]models.PeminjamanBarangDetail)
+	if len(kodePeminjamanList) == 0 {
+		return result, nil
+	}
+
+	// Build placeholders ($1, $2, $3, ...)
+	placeholders := make([]string, len(kodePeminjamanList))
+	args := make([]interface{}, len(kodePeminjamanList))
+	for i, kode := range kodePeminjamanList {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = kode
+	}
+
+	query := fmt.Sprintf(`
+		SELECT pb.kode_peminjaman, pb.kode_peminjaman_barang, pb.kode_barang, pb.jumlah,
+		       b.kode_barang, b.nama_barang, b.deskripsi, b.jumlah_total, b.ruangan_kode
+		FROM peminjaman_barang pb
+		JOIN barang b ON pb.kode_barang = b.kode_barang
+		WHERE pb.kode_peminjaman IN (%s)
+	`, strings.Join(placeholders, ", "))
+
+	rows, err := r.DB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			kodePeminjaman string
+			item           models.PeminjamanBarangDetail
+			barang         models.Barang
+			ruanganKode    sql.NullString
+		)
+		err := rows.Scan(
+			&kodePeminjaman,
+			&item.KodePeminjamanBarang,
+			&item.KodeBarang,
+			&item.Jumlah,
+			&barang.KodeBarang,
+			&barang.NamaBarang,
+			&barang.Deskripsi,
+			&barang.JumlahTotal,
+			&ruanganKode,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if ruanganKode.Valid {
+			barang.RuanganKode = &ruanganKode.String
+		}
+		item.Barang = &barang
+		result[kodePeminjaman] = append(result[kodePeminjaman], item)
+	}
+
 	return result, nil
 }

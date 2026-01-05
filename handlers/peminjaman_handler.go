@@ -133,23 +133,16 @@ func (h *PeminjamanHandler) GetMyPeminjaman(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Enrich dengan data relasi
-	for i := range peminjaman {
-		if peminjaman[i].KodeRuangan != nil {
-			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
-			peminjaman[i].Ruangan = ruangan
+	// Batch fetch barang untuk semua peminjaman (mengurangi N queries menjadi 1 query)
+	if len(peminjaman) > 0 {
+		kodePeminjamanList := make([]string, len(peminjaman))
+		for i, p := range peminjaman {
+			kodePeminjamanList[i] = p.KodePeminjaman
 		}
-		if peminjaman[i].KodeKegiatan != nil {
-			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
-			peminjaman[i].Kegiatan = kegiatan
+		barangMap, _ := h.PeminjamanRepo.GetPeminjamanBarangByIDs(kodePeminjamanList)
+		for i := range peminjaman {
+			peminjaman[i].Barang = barangMap[peminjaman[i].KodePeminjaman]
 		}
-		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
-		if user != nil {
-			user.PasswordHash = ""
-			peminjaman[i].Peminjam = user
-		}
-		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
-		peminjaman[i].Barang = items
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -304,23 +297,16 @@ func (h *PeminjamanHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enrich dengan data relasi
-	for i := range peminjaman {
-		if peminjaman[i].KodeRuangan != nil {
-			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
-			peminjaman[i].Ruangan = ruangan
+	// Batch fetch barang untuk semua peminjaman
+	if len(peminjaman) > 0 {
+		kodePeminjamanList := make([]string, len(peminjaman))
+		for i, p := range peminjaman {
+			kodePeminjamanList[i] = p.KodePeminjaman
 		}
-		if peminjaman[i].KodeKegiatan != nil {
-			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
-			peminjaman[i].Kegiatan = kegiatan
+		barangMap, _ := h.PeminjamanRepo.GetPeminjamanBarangByIDs(kodePeminjamanList)
+		for i := range peminjaman {
+			peminjaman[i].Barang = barangMap[peminjaman[i].KodePeminjaman]
 		}
-		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
-		if user != nil {
-			user.PasswordHash = ""
-			peminjaman[i].Peminjam = user
-		}
-		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
-		peminjaman[i].Barang = items
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -592,27 +578,22 @@ func (h *PeminjamanHandler) GetLaporan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i := range peminjaman {
-		if peminjaman[i].KodeRuangan != nil {
-			ruangan, _ := h.RuanganRepo.GetByID(*peminjaman[i].KodeRuangan)
-			peminjaman[i].Ruangan = ruangan
+	// Batch fetch barang
+	if len(peminjaman) > 0 {
+		kodePeminjamanList := make([]string, len(peminjaman))
+		for i, p := range peminjaman {
+			kodePeminjamanList[i] = p.KodePeminjaman
 		}
-		if peminjaman[i].KodeKegiatan != nil {
-			kegiatan, _ := h.KegiatanRepo.GetByID(*peminjaman[i].KodeKegiatan)
-			peminjaman[i].Kegiatan = kegiatan
-		}
-		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
-		if user != nil {
-			user.PasswordHash = ""
-			// Load organisasi data jika user memiliki organisasi_kode
-			if user.OrganisasiKode != nil {
-				organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
-				user.Organisasi = organisasi
+		barangMap, _ := h.PeminjamanRepo.GetPeminjamanBarangByIDs(kodePeminjamanList)
+		for i := range peminjaman {
+			peminjaman[i].Barang = barangMap[peminjaman[i].KodePeminjaman]
+
+			// Load organisasi data jika user memiliki organisasi_kode (Partial N+1, but significantly reduced)
+			if peminjaman[i].Peminjam != nil && peminjaman[i].Peminjam.OrganisasiKode != nil {
+				organisasi, _ := h.OrganisasiRepo.GetByID(*peminjaman[i].Peminjam.OrganisasiKode)
+				peminjaman[i].Peminjam.Organisasi = organisasi
 			}
-			peminjaman[i].Peminjam = user
 		}
-		items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman[i].KodePeminjaman)
-		peminjaman[i].Barang = items
 	}
 
 	w.Header().Set("Content-Type", "application/json")

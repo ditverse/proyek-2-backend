@@ -200,8 +200,8 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.Handle("/api/peminjaman/me", withAuth(http.HandlerFunc(peminjamanHandler.GetMyPeminjaman)))
 	mux.Handle("/api/peminjaman/pending", withRole(http.HandlerFunc(peminjamanHandler.GetPending), "SARPRAS", "ADMIN"))
 	mux.Handle("/api/jadwal-ruangan", corsMiddleware(http.HandlerFunc(peminjamanHandler.GetJadwalRuangan)))
-	mux.Handle("/api/jadwal-aktif", withRole(http.HandlerFunc(peminjamanHandler.GetJadwalAktif), "SECURITY", "ADMIN"))
-	mux.Handle("/api/jadwal-aktif-belum-verifikasi", withRole(http.HandlerFunc(peminjamanHandler.GetJadwalAktifBelumVerifikasi), "SECURITY", "ADMIN"))
+	mux.Handle("/api/jadwal-aktif", corsMiddleware(http.HandlerFunc(peminjamanHandler.GetJadwalAktif)))
+	mux.Handle("/api/jadwal-aktif-belum-verifikasi", corsMiddleware(http.HandlerFunc(peminjamanHandler.GetJadwalAktifBelumVerifikasi)))
 	mux.Handle("/api/laporan/peminjaman", withRole(http.HandlerFunc(peminjamanHandler.GetLaporan), "SARPRAS", "ADMIN"))
 	mux.Handle("/api/laporan/peminjaman/export", withRole(http.HandlerFunc(exportHandler.ExportPeminjamanToExcel), "SARPRAS", "ADMIN"))
 

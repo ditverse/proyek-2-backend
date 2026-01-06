@@ -456,7 +456,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 		JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
 		JOIN users u ON p.kode_user = u.kode_user
 		WHERE p.kode_ruangan IS NOT NULL
-		  AND p.status = 'APPROVED'
+		  AND p.status IN ('PENDING', 'APPROVED')
 		  AND p.tanggal_mulai <= $2
 		  AND p.tanggal_selesai >= $1
 		ORDER BY p.tanggal_mulai
@@ -497,7 +497,7 @@ func (r *PeminjamanRepository) GetJadwalAktif(start, end time.Time) ([]models.Pe
 		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
-		WHERE status = 'APPROVED'
+		WHERE status IN ('PENDING', 'APPROVED')
 		  AND kode_ruangan IS NOT NULL
 		  AND tanggal_mulai >= $1
 		  AND tanggal_selesai <= $2

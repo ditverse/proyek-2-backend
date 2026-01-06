@@ -3,9 +3,10 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
-	storagesvc "backend-sarpras/internal/services"
+	internalsvc "backend-sarpras/internal/services"
 	"backend-sarpras/models"
 	"backend-sarpras/repositories"
 )
@@ -17,6 +18,9 @@ type PeminjamanService struct {
 	LogRepo        *repositories.LogAktivitasRepository
 	UserRepo       *repositories.UserRepository
 	KegiatanRepo   *repositories.KegiatanRepository
+	OrganisasiRepo *repositories.OrganisasiRepository
+	RuanganRepo    *repositories.RuanganRepository
+	EmailService   *internalsvc.EmailService
 }
 
 func NewPeminjamanService(
@@ -26,6 +30,9 @@ func NewPeminjamanService(
 	logRepo *repositories.LogAktivitasRepository,
 	userRepo *repositories.UserRepository,
 	kegiatanRepo *repositories.KegiatanRepository,
+	organisasiRepo *repositories.OrganisasiRepository,
+	ruanganRepo *repositories.RuanganRepository,
+	emailService *internalsvc.EmailService,
 ) *PeminjamanService {
 	return &PeminjamanService{
 		PeminjamanRepo: peminjamanRepo,
@@ -34,6 +41,9 @@ func NewPeminjamanService(
 		LogRepo:        logRepo,
 		UserRepo:       userRepo,
 		KegiatanRepo:   kegiatanRepo,
+		OrganisasiRepo: organisasiRepo,
+		RuanganRepo:    ruanganRepo,
+		EmailService:   emailService,
 	}
 }
 
@@ -146,7 +156,7 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 	// Move file from old path (frontend-provided) to new unique path in storage
 	// Only if path is not a placeholder and file actually exists in storage
 	if !isPlaceholder && suratPath != uniquePath {
-		if err := storagesvc.MoveFile(suratPath, uniquePath); err != nil {
+		if err := internalsvc.MoveFile(suratPath, uniquePath); err != nil {
 			// File doesn't exist or move failed - this is OK
 			// User can upload later via /upload-surat endpoint
 			fmt.Printf("Info: skipping file move (file may not exist yet): %v\n", err)
@@ -252,5 +262,141 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 		Status:          models.NotifikasiTerkirim,
 	})
 
+	// Send email notification asynchronously (non-blocking)
+	if s.EmailService != nil && s.EmailService.IsEnabled() {
+		go s.sendVerificationEmails(kodePeminjaman, verifierKode, req.Status, req.CatatanVerifikasi)
+	}
+
 	return nil
+}
+
+// sendVerificationEmails sends email notifications after verification (runs async)
+func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode string, status models.PeminjamanStatusEnum, catatan string) {
+	// Fetch full peminjaman data with related entities
+	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
+	if err != nil || peminjaman == nil {
+		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
+		return
+	}
+
+	// Get peminjam (mahasiswa) data
+	peminjam, err := s.UserRepo.GetByID(peminjaman.KodeUser)
+	if err != nil || peminjam == nil {
+		log.Printf("❌ Email: failed to get peminjam: %v", err)
+		return
+	}
+
+	// Get verifier (sarpras) data
+	verifier, _ := s.UserRepo.GetByID(verifierKode)
+	verifierName := "Sarpras"
+	if verifier != nil {
+		verifierName = verifier.Nama
+	}
+
+	// Get kegiatan data
+	var namaKegiatan, deskripsiKegiatan string
+	if peminjaman.KodeKegiatan != nil {
+		if kegiatan, err := s.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan); err == nil && kegiatan != nil {
+			namaKegiatan = kegiatan.NamaKegiatan
+			deskripsiKegiatan = kegiatan.Deskripsi
+		}
+	}
+	if namaKegiatan == "" {
+		namaKegiatan = "Peminjaman " + kodePeminjaman
+	}
+
+	// Get ruangan data
+	var namaRuangan, lokasiRuangan string
+	var kapasitas int
+	if peminjaman.KodeRuangan != nil {
+		if ruangan, err := s.RuanganRepo.GetByID(*peminjaman.KodeRuangan); err == nil && ruangan != nil {
+			namaRuangan = ruangan.NamaRuangan
+			lokasiRuangan = ruangan.Lokasi
+			kapasitas = ruangan.Kapasitas
+		}
+	}
+
+	// Get organisasi data
+	var namaOrganisasi string
+	if peminjam.OrganisasiKode != nil {
+		if org, err := s.OrganisasiRepo.GetByID(*peminjam.OrganisasiKode); err == nil && org != nil {
+			namaOrganisasi = org.NamaOrganisasi
+		}
+	}
+
+	// Get barang data
+	barangList, _ := s.PeminjamanRepo.GetPeminjamanBarang(kodePeminjaman)
+	var barangItems []internalsvc.BarangItem
+	for _, b := range barangList {
+		namaBarang := b.KodeBarang
+		if barang, err := s.BarangRepo.GetByID(b.KodeBarang); err == nil && barang != nil {
+			namaBarang = barang.NamaBarang
+		}
+		barangItems = append(barangItems, internalsvc.BarangItem{
+			NamaBarang: namaBarang,
+			Jumlah:     b.Jumlah,
+		})
+	}
+
+	// Get no HP
+	var noHP string
+	if peminjam.NoHP != nil {
+		noHP = *peminjam.NoHP
+	}
+
+	// Build template data
+	templateData := internalsvc.EmailTemplateData{
+		KodePeminjaman:    kodePeminjaman,
+		Status:            string(status),
+		CatatanVerifikasi: catatan,
+		NamaPeminjam:      peminjam.Nama,
+		EmailPeminjam:     peminjam.Email,
+		NoHPPeminjam:      noHP,
+		NamaOrganisasi:    namaOrganisasi,
+		NamaKegiatan:      namaKegiatan,
+		DeskripsiKegiatan: deskripsiKegiatan,
+		NamaRuangan:       namaRuangan,
+		LokasiRuangan:     lokasiRuangan,
+		Kapasitas:         kapasitas,
+		TanggalMulai:      peminjaman.TanggalMulai,
+		TanggalSelesai:    peminjaman.TanggalSelesai,
+		TanggalVerifikasi: time.Now(),
+		NamaVerifikator:   verifierName,
+		Barang:            barangItems,
+	}
+
+	// Send email to mahasiswa
+	if status == models.StatusPeminjamanApproved {
+		// Approved email
+		subject := internalsvc.GetApprovedEmailSubject(namaKegiatan)
+		htmlBody := internalsvc.BuildApprovedEmailHTML(templateData)
+		if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
+			log.Printf("❌ Email: failed to send approval to %s: %v", peminjam.Email, err)
+		} else {
+			log.Printf("✅ Email: approval sent to %s", peminjam.Email)
+		}
+
+		// Send to security users
+		securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity)
+		if err == nil && len(securityUsers) > 0 {
+			securitySubject := internalsvc.GetSecurityEmailSubject(namaKegiatan, peminjaman.TanggalMulai)
+			securityHTML := internalsvc.BuildSecurityNotificationHTML(templateData)
+			for _, sec := range securityUsers {
+				if err := s.EmailService.SendEmail(sec.Email, securitySubject, securityHTML); err != nil {
+					log.Printf("❌ Email: failed to send to security %s: %v", sec.Email, err)
+				} else {
+					log.Printf("✅ Email: security notification sent to %s", sec.Email)
+				}
+			}
+		}
+	} else {
+		// Rejected email
+		subject := internalsvc.GetRejectedEmailSubject(namaKegiatan)
+		htmlBody := internalsvc.BuildRejectedEmailHTML(templateData)
+		if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
+			log.Printf("❌ Email: failed to send rejection to %s: %v", peminjam.Email, err)
+		} else {
+			log.Printf("✅ Email: rejection sent to %s", peminjam.Email)
+		}
+	}
 }

@@ -3,6 +3,7 @@ package router
 import (
 	"backend-sarpras/handlers"
 	"backend-sarpras/internal/config"
+	internalsvc "backend-sarpras/internal/services"
 	"backend-sarpras/middleware"
 	"backend-sarpras/repositories"
 	"backend-sarpras/services"
@@ -30,6 +31,7 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
+	emailService := internalsvc.NewEmailService()
 	peminjamanService := services.NewPeminjamanService(
 		peminjamanRepo,
 		barangRepo,
@@ -37,6 +39,9 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		logRepo,
 		userRepo,
 		kegiatanRepo,
+		organisasiRepo,
+		ruanganRepo,
+		emailService,
 	)
 	kehadiranService := services.NewKehadiranService(
 		kehadiranRepo,

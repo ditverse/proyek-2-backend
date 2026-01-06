@@ -60,4 +60,5 @@ type JadwalRuanganResponse struct {
 	Status         PeminjamanStatusEnum `json:"status"`
 	Peminjam       string               `json:"peminjam"`
 	Organisasi     string               `json:"organisasi"`
+	NamaKegiatan   string               `json:"nama_kegiatan"`
 }

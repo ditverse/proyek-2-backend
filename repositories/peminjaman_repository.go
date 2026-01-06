@@ -451,10 +451,12 @@ func (r *PeminjamanRepository) GetPending() ([]models.Peminjaman, error) {
 func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.JadwalRuanganResponse, error) {
 	query := `
 		SELECT p.kode_peminjaman, p.kode_ruangan, r.nama_ruangan, p.tanggal_mulai, p.tanggal_selesai,
-		       p.status, u.nama, COALESCE(u.organisasi_kode, '') as organisasi_kode
+		       p.status, u.nama, COALESCE(u.organisasi_kode, '') as organisasi_kode,
+			   COALESCE(k.nama_kegiatan, 'Penggunaan Ruangan') as nama_kegiatan
 		FROM peminjaman p
 		JOIN ruangan r ON p.kode_ruangan = r.kode_ruangan
 		JOIN users u ON p.kode_user = u.kode_user
+		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
 		WHERE p.kode_ruangan IS NOT NULL
 		  AND p.status IN ('PENDING', 'APPROVED')
 		  AND p.tanggal_mulai <= $2
@@ -479,6 +481,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 			&j.Status,
 			&j.Peminjam,
 			&j.Organisasi,
+			&j.NamaKegiatan,
 		)
 		if err != nil {
 			return nil, err

@@ -551,23 +551,46 @@ Lihat `migrations/002_auto_generate_codes.sql` untuk detail implementasi.
 
 ### Hot Reload dengan Air
 
-File konfigurasi: `.air.toml`
+Project ini mendukung Air untuk Windows dan Linux dengan konfigurasi terpisah:
 
-```toml
-root = "."
-tmp_dir = "tmp"
+| File | OS | Binary |
+|------|-----|--------|
+| `.air.windows.toml` | Windows | `tmp\main.exe` |
+| `.air.linux.toml` | Linux/macOS | `./tmp/main` |
 
-[build]
-cmd = "go build -o ./tmp/server.exe ./cmd/server"
-bin = "tmp/server.exe"
-include_ext = ["go"]
-exclude_dir = ["tmp", "vendor"]
+#### Install Air
 
-[log]
-time = true
+```bash
+# Windows/Linux/macOS
+go install github.com/air-verse/air@latest
 ```
 
-Jalankan:
+> **Note untuk Linux**: Pastikan `~/go/bin` sudah ada di PATH. Untuk Fish shell:
+> ```bash
+> fish_add_path ~/go/bin
+> ```
+
+#### Menjalankan Air
+
+**Opsi 1: Menggunakan Script Wrapper (Rekomendasi)**
+```bash
+# Linux/macOS
+./run-air.sh
+
+# Windows
+run-air.bat
+```
+
+**Opsi 2: Manually dengan config file**
+```bash
+# Linux/macOS
+air -c .air.linux.toml
+
+# Windows
+air -c .air.windows.toml
+```
+
+**Opsi 3: Default config (sesuaikan dengan OS)**
 ```bash
 air
 ```

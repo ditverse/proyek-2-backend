@@ -884,3 +884,51 @@ func (r *PeminjamanRepository) GetPeminjamanBarangByIDs(kodePeminjamanList []str
 
 	return result, nil
 }
+
+// UpdateStatusToOngoing updates APPROVED peminjaman to ONGOING
+// where tanggal_mulai <= now <= tanggal_selesai
+func (r *PeminjamanRepository) UpdateStatusToOngoing(now time.Time) (int64, error) {
+	query := `
+		UPDATE peminjaman
+		SET status = 'ONGOING',
+		    updated_at = NOW()
+		WHERE status = 'APPROVED'
+		  AND tanggal_mulai <= $1
+		  AND tanggal_selesai > $1
+	`
+	result, err := r.DB.Exec(query, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// UpdateStatusToFinished updates APPROVED/ONGOING peminjaman to FINISHED
+// where tanggal_selesai < now
+func (r *PeminjamanRepository) UpdateStatusToFinished(now time.Time) (int64, error) {
+	query := `
+		UPDATE peminjaman
+		SET status = 'FINISHED',
+		    updated_at = NOW()
+		WHERE status IN ('APPROVED', 'ONGOING')
+		  AND tanggal_selesai < $1
+	`
+	result, err := r.DB.Exec(query, now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+// UpdateStatusOnly updates only the status field without changing verifier info
+// Used by scheduler for automatic status transitions
+func (r *PeminjamanRepository) UpdateStatusOnly(kodePeminjaman string, status models.PeminjamanStatusEnum) error {
+	query := `
+		UPDATE peminjaman
+		SET status = $1,
+		    updated_at = NOW()
+		WHERE kode_peminjaman = $2
+	`
+	_, err := r.DB.Exec(query, status, kodePeminjaman)
+	return err
+}

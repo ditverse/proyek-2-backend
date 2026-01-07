@@ -186,6 +186,13 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				}
 
+			case strings.HasSuffix(remaining, "/cancel"):
+				if r.Method == http.MethodPost {
+					withRole(http.HandlerFunc(peminjamanHandler.CancelPeminjaman), "SARPRAS", "ADMIN").ServeHTTP(w, r)
+				} else {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				}
+
 			default:
 				// Regular ID lookup
 				if r.Method == http.MethodGet {

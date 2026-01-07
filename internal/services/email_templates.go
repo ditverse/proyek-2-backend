@@ -401,3 +401,93 @@ func GetRejectedEmailSubject(namaKegiatan string) string {
 func GetSecurityEmailSubject(namaKegiatan string, tanggal time.Time) string {
 	return fmt.Sprintf("🔔 Jadwal Kegiatan: %s - %s", namaKegiatan, FormatDateShort(tanggal))
 }
+
+// BuildCancelledEmailHTML builds HTML email for cancelled loan
+func BuildCancelledEmailHTML(data EmailTemplateData) string {
+	alasan := data.CatatanVerifikasi
+	if alasan == "" {
+		alasan = "Tidak ada keterangan"
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peminjaman Dibatalkan</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+        .container { background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #fd7e14, #dc3545); color: white; padding: 20px; border-radius: 10px 10px 0 0; margin: -30px -30px 20px -30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header .icon { font-size: 48px; margin-bottom: 10px; }
+        .section { background: #f8f9fa; border-left: 4px solid #fd7e14; padding: 15px; margin: 15px 0; border-radius: 0 5px 5px 0; }
+        .section-title { font-weight: bold; color: #fd7e14; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .info-row { display: flex; margin: 8px 0; }
+        .info-label { color: #666; min-width: 140px; }
+        .info-value { color: #333; font-weight: 500; }
+        .status-cancelled { background: #ffe5d0; color: #c92a2a; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; }
+        .alasan-box { background: #fff3cd; border: 2px solid #fd7e14; padding: 20px; border-radius: 5px; margin: 20px 0; }
+        .alasan-title { color: #856404; font-weight: bold; margin-bottom: 10px; font-size: 16px; }
+        .alasan-text { color: #856404; font-size: 15px; margin: 0; }
+        .saran-box { background: #d1ecf1; border: 1px solid #17a2b8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .saran-title { color: #0c5460; font-weight: bold; margin-bottom: 5px; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">⚠️</div>
+            <h1>Peminjaman Dibatalkan</h1>
+        </div>
+        
+        <p>Kepada Yth. <strong>%s</strong>,</p>
+        
+        <p>Kami informasikan bahwa peminjaman fasilitas Anda telah <strong>DIBATALKAN</strong> oleh petugas Sarpras.</p>
+        
+        <div class="section">
+            <div class="section-title">📋 Informasi Peminjaman</div>
+            <div class="info-row"><span class="info-label">Kode Peminjaman</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-cancelled">⚠️ DIBATALKAN</span></span></div>
+            <div class="info-row"><span class="info-label">Dibatalkan oleh</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Tanggal Pembatalan</span><span class="info-value">%s</span></div>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">📝 Detail Pengajuan yang Dibatalkan</div>
+            <div class="info-row"><span class="info-label">Nama Kegiatan</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Ruangan</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Tanggal</span><span class="info-value">%s - %s</span></div>
+        </div>
+        
+        <div class="alasan-box">
+            <div class="alasan-title">📝 Alasan Pembatalan:</div>
+            <p class="alasan-text">%s</p>
+        </div>
+        
+        <div class="saran-box">
+            <div class="saran-title">💡 Informasi:</div>
+            <p style="margin: 0; color: #0c5460;">Jika Anda merasa pembatalan ini tidak sesuai atau ada pertanyaan, silakan hubungi Unit Sarpras untuk informasi lebih lanjut.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Terima kasih atas pengertiannya.</p>
+            <p><strong>Unit Sarana dan Prasarana</strong></p>
+        </div>
+    </div>
+</body>
+</html>`,
+		EscapeHTML(data.NamaPeminjam),
+		EscapeHTML(data.KodePeminjaman),
+		EscapeHTML(data.NamaVerifikator),
+		FormatDate(data.TanggalVerifikasi),
+		EscapeHTML(data.NamaKegiatan),
+		EscapeHTML(data.NamaRuangan),
+		FormatDateShort(data.TanggalMulai),
+		FormatDateShort(data.TanggalSelesai),
+		EscapeHTML(alasan),
+	)
+
+	return html
+}

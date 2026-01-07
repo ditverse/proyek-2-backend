@@ -400,3 +400,136 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 		}
 	}
 }
+
+// CancelPeminjaman cancels an APPROVED or ONGOING peminjaman
+// Only SARPRAS/ADMIN can cancel bookings
+func (s *PeminjamanService) CancelPeminjaman(kodePeminjaman, cancellerKode, alasan string) error {
+	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
+	if err != nil {
+		return err
+	}
+	if peminjaman == nil {
+		return errors.New("peminjaman tidak ditemukan")
+	}
+
+	// Validate status - can only cancel APPROVED or ONGOING
+	if peminjaman.Status != models.StatusPeminjamanApproved && peminjaman.Status != models.StatusPeminjamanOngoing {
+		return errors.New("hanya peminjaman dengan status APPROVED atau ONGOING yang dapat dibatalkan")
+	}
+
+	// Update status to CANCELLED
+	if err := s.PeminjamanRepo.UpdateStatus(kodePeminjaman, models.StatusPeminjamanCanceled, &cancellerKode, alasan); err != nil {
+		return err
+	}
+
+	// Log activity
+	s.LogRepo.Create(&models.LogAktivitas{
+		KodeLog:        generateCode("LOG"),
+		KodeUser:       &cancellerKode,
+		KodePeminjaman: &kodePeminjaman,
+		Aksi:           "CANCEL_PEMINJAMAN",
+		Keterangan:     fmt.Sprintf("Peminjaman dibatalkan oleh SARPRAS. Alasan: %s", alasan),
+	})
+
+	// Create notification for peminjam
+	pesan := "Peminjaman Anda telah dibatalkan oleh SARPRAS"
+	if alasan != "" {
+		pesan += ". Alasan: " + alasan
+	}
+
+	s.NotifikasiRepo.Create(&models.Notifikasi{
+		KodeNotifikasi:  generateCode("NTF"),
+		KodeUser:        peminjaman.KodeUser,
+		KodePeminjaman:  &kodePeminjaman,
+		JenisNotifikasi: models.NotifStatusRejected, // Reuse rejected notification type
+		Pesan:           pesan,
+		Status:          models.NotifikasiTerkirim,
+	})
+
+	// Send email notification asynchronously (non-blocking)
+	if s.EmailService != nil && s.EmailService.IsEnabled() {
+		go s.sendCancellationEmail(kodePeminjaman, cancellerKode, alasan)
+	}
+
+	return nil
+}
+
+// sendCancellationEmail sends email notification after cancellation (runs async)
+func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode, alasan string) {
+	// Fetch full peminjaman data with related entities
+	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
+	if err != nil || peminjaman == nil {
+		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
+		return
+	}
+
+	// Get peminjam (mahasiswa) data
+	peminjam, err := s.UserRepo.GetByID(peminjaman.KodeUser)
+	if err != nil || peminjam == nil {
+		log.Printf("❌ Email: failed to get peminjam: %v", err)
+		return
+	}
+
+	// Get canceller (sarpras) data
+	canceller, _ := s.UserRepo.GetByID(cancellerKode)
+	cancellerName := "Sarpras"
+	if canceller != nil {
+		cancellerName = canceller.Nama
+	}
+
+	// Get kegiatan data
+	var namaKegiatan string
+	if peminjaman.KodeKegiatan != nil {
+		if kegiatan, err := s.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan); err == nil && kegiatan != nil {
+			namaKegiatan = kegiatan.NamaKegiatan
+		}
+	}
+	if namaKegiatan == "" {
+		namaKegiatan = "Peminjaman " + kodePeminjaman
+	}
+
+	// Get ruangan data
+	var namaRuangan string
+	if peminjaman.KodeRuangan != nil {
+		if ruangan, err := s.RuanganRepo.GetByID(*peminjaman.KodeRuangan); err == nil && ruangan != nil {
+			namaRuangan = ruangan.NamaRuangan
+		}
+	}
+
+	// Build template data
+	templateData := internalsvc.EmailTemplateData{
+		KodePeminjaman:    kodePeminjaman,
+		Status:            "CANCELLED",
+		CatatanVerifikasi: alasan,
+		NamaPeminjam:      peminjam.Nama,
+		EmailPeminjam:     peminjam.Email,
+		NamaKegiatan:      namaKegiatan,
+		NamaRuangan:       namaRuangan,
+		TanggalMulai:      peminjaman.TanggalMulai,
+		TanggalSelesai:    peminjaman.TanggalSelesai,
+		TanggalVerifikasi: time.Now(),
+		NamaVerifikator:   cancellerName,
+	}
+
+	// Send cancellation email to mahasiswa
+	subject := fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s", namaKegiatan)
+	htmlBody := internalsvc.BuildCancelledEmailHTML(templateData)
+	if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
+		log.Printf("❌ Email: failed to send cancellation to %s: %v", peminjam.Email, err)
+	} else {
+		log.Printf("✅ Email: cancellation sent to %s", peminjam.Email)
+	}
+
+	// Also notify security about the cancellation
+	securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity)
+	if err == nil && len(securityUsers) > 0 {
+		securitySubject := fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s (%s)", namaKegiatan, peminjaman.TanggalMulai.Format("02 Jan 2006"))
+		for _, sec := range securityUsers {
+			if err := s.EmailService.SendEmail(sec.Email, securitySubject, htmlBody); err != nil {
+				log.Printf("❌ Email: failed to send cancellation to security %s: %v", sec.Email, err)
+			} else {
+				log.Printf("✅ Email: cancellation notification sent to security %s", sec.Email)
+			}
+		}
+	}
+}

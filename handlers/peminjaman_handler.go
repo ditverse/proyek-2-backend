@@ -671,6 +671,47 @@ func (h *PeminjamanHandler) GetBookedDates(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(bookedDates)
 }
 
+// CancelPeminjaman handles POST /api/peminjaman/{kode}/cancel
+// Only for SARPRAS/ADMIN role, only for APPROVED/ONGOING status
+func (h *PeminjamanHandler) CancelPeminjaman(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	user := middleware.GetUserFromContext(r)
+	if user == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	kode, err := extractKodePeminjaman(strings.TrimSuffix(r.URL.Path, "/cancel"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body for cancellation reason
+	var req struct {
+		Alasan string `json:"alasan"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		// Alasan is optional, so we don't return error for empty body
+		req.Alasan = ""
+	}
+
+	err = h.PeminjamanService.CancelPeminjaman(kode, user.KodeUser, req.Alasan)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Peminjaman berhasil dibatalkan"})
+}
+
 func extractKodePeminjaman(path string) (string, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {

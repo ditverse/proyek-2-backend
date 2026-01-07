@@ -4,7 +4,9 @@ import (
 	"backend-sarpras/internal/config"
 	"backend-sarpras/internal/db"
 	"backend-sarpras/internal/router"
+	internalsvc "backend-sarpras/internal/services"
 	"backend-sarpras/middleware"
+	"backend-sarpras/repositories"
 	"context"
 	"log"
 	"net/http"
@@ -24,6 +26,14 @@ func main() {
 	// Buka koneksi database Supabase
 	conn := db.Open(cfg.DatabaseURL)
 	defer conn.Close()
+
+	// Initialize peminjaman repository for scheduler
+	peminjamanRepo := repositories.NewPeminjamanRepository(conn)
+
+	// Start status scheduler for automatic ONGOING/FINISHED transitions
+	statusScheduler := internalsvc.NewStatusScheduler(peminjamanRepo)
+	statusScheduler.Start()
+	defer statusScheduler.Stop()
 
 	// Setup router dengan config
 	handler := router.New(conn, cfg)

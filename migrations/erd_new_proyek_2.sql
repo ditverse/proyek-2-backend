@@ -7,10 +7,8 @@ CREATE TYPE "role_enum" AS ENUM (
 );
 
 CREATE TYPE "jenis_org_enum" AS ENUM (
-  'HMJ',
   'UKM',
-  'BEM',
-  'MPM'
+  'ORMAWA'
 );
 
 CREATE TYPE "peminjaman_status_enum" AS ENUM (
@@ -22,12 +20,12 @@ CREATE TYPE "peminjaman_status_enum" AS ENUM (
   'CANCELLED'
 );
 
-CREATE TYPE "notifikasi_status_enum" AS ENUM (
+CREATE TYPE "mailbox_status_enum" AS ENUM (
   'TERKIRIM',
   'DIBACA'
 );
 
-CREATE TYPE "notifikasi_jenis_enum" AS ENUM (
+CREATE TYPE "mailbox_jenis_enum" AS ENUM (
   'PENGAJUAN_DIBUAT',
   'STATUS_APPROVED',
   'STATUS_REJECTED',
@@ -111,13 +109,13 @@ CREATE TABLE "peminjaman_barang" (
   "jumlah" int
 );
 
-CREATE TABLE "notifikasi" (
-  "kode_notifikasi" varchar PRIMARY KEY,
+CREATE TABLE "mailbox" (
+  "kode_mailbox" varchar PRIMARY KEY,
   "kode_user" varchar,
   "kode_peminjaman" varchar,
-  "jenis_notifikasi" notifikasi_jenis_enum,
+  "jenis_mailbox" mailbox_jenis_enum,
   "pesan" text,
-  "status" notifikasi_status_enum,
+  "status" mailbox_status_enum,
   "created_at" timestamp DEFAULT now(),
   "updated_at" timestamp
 );
@@ -171,10 +169,10 @@ ALTER TABLE "peminjaman_barang"
 ALTER TABLE "peminjaman_barang" 
   ADD FOREIGN KEY ("kode_barang") REFERENCES "barang" ("kode_barang");
 
-ALTER TABLE "notifikasi" 
+ALTER TABLE "mailbox" 
   ADD FOREIGN KEY ("kode_user") REFERENCES "users" ("kode_user");
 
-ALTER TABLE "notifikasi" 
+ALTER TABLE "mailbox" 
   ADD FOREIGN KEY ("kode_peminjaman") REFERENCES "peminjaman" ("kode_peminjaman");
 
 ALTER TABLE "log_aktivitas" 

@@ -458,7 +458,7 @@ func (r *PeminjamanRepository) GetJadwalRuangan(start, end time.Time) ([]models.
 		JOIN users u ON p.kode_user = u.kode_user
 		LEFT JOIN kegiatan k ON p.kode_kegiatan = k.kode_kegiatan
 		WHERE p.kode_ruangan IS NOT NULL
-		  AND p.status IN ('PENDING', 'APPROVED')
+		  AND p.status IN ('PENDING', 'APPROVED', 'ONGOING')
 		  AND p.tanggal_mulai <= $2
 		  AND p.tanggal_selesai >= $1
 		ORDER BY p.tanggal_mulai
@@ -500,10 +500,10 @@ func (r *PeminjamanRepository) GetJadwalAktif(start, end time.Time) ([]models.Pe
 		       status, path_surat_digital, verified_by, verified_at,
 		       catatan_verifikasi, created_at, updated_at
 		FROM peminjaman
-		WHERE status IN ('PENDING', 'APPROVED')
+		WHERE status IN ('PENDING', 'APPROVED', 'ONGOING')
 		  AND kode_ruangan IS NOT NULL
-		  AND tanggal_mulai >= $1
-		  AND tanggal_selesai <= $2
+		  AND tanggal_mulai <= $2
+		  AND tanggal_selesai >= $1
 		ORDER BY tanggal_mulai
 	`
 	rows, err := r.DB.Query(query, start, end)
@@ -523,8 +523,8 @@ func (r *PeminjamanRepository) GetJadwalAktifBelumVerifikasi(start, end time.Tim
 		LEFT JOIN kehadiran_peminjam k ON k.kode_peminjaman = p.kode_peminjaman
 		WHERE p.status = 'APPROVED'
 		  AND p.kode_ruangan IS NOT NULL
-		  AND p.tanggal_mulai >= $1
-		  AND p.tanggal_selesai <= $2
+		  AND p.tanggal_mulai <= $2
+		  AND p.tanggal_selesai >= $1
 		  AND k.kode_kehadiran IS NULL
 		ORDER BY p.tanggal_mulai
 	`

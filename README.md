@@ -8,84 +8,89 @@
 
 ---
 
-## 📋 Daftar Isi
+## Daftar Isi
 
-- [Tentang Project](#-tentang-project)
-- [Fitur Utama](#-fitur-utama)
-- [Teknologi](#-teknologi)
-- [Struktur Project](#-struktur-project)
-- [Setup & Installation](#-setup--installation)
-- [API Documentation](#-api-documentation)
-- [Database Schema](#-database-schema)
-- [Role & Permissions](#-role--permissions)
-- [Development](#-development)
-- [Troubleshooting](#-troubleshooting)
+- [Tentang Project](#tentang-project)
+- [Fitur Utama](#fitur-utama)
+- [Teknologi](#teknologi)
+- [Struktur Project](#struktur-project)
+- [Setup dan Installation](#setup-dan-installation)
+- [API Documentation](#api-documentation)
+- [Database Schema](#database-schema)
+- [Role dan Permissions](#role-dan-permissions)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## 🎯 Tentang Project
+## Tentang Project
 
 Sistem web-based untuk mengelola peminjaman ruangan dan barang di lingkungan kampus. Sistem ini mendukung workflow lengkap dari pengajuan peminjaman oleh mahasiswa, verifikasi oleh petugas sarpras, hingga pencatatan kehadiran oleh petugas security.
 
 ### Workflow Peminjaman
 
 ```
-┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐
-│  MAHASISWA  │─────▶│   SARPRAS    │─────▶│  SECURITY   │─────▶│   FINISHED   │
-│  Mengajukan │      │ Verifikasi   │      │  Verifikasi │      │   Selesai    │
-│  Peminjaman │      │ APPROVED/    │      │  Kehadiran  │      │              │
-│             │      │  REJECTED    │      │             │      │              │
-└─────────────┘      └──────────────┘      └─────────────┘      └──────────────┘
++--------------+      +---------------+      +--------------+      +---------------+
+|  MAHASISWA   |----->|    SARPRAS    |----->|   SECURITY   |----->|   FINISHED    |
+|  Mengajukan  |      |  Verifikasi   |      |  Verifikasi  |      |    Selesai    |
+|  Peminjaman  |      |  APPROVED/    |      |  Kehadiran   |      |               |
+|              |      |  REJECTED     |      |              |      |               |
++--------------+      +---------------+      +--------------+      +---------------+
     PENDING              APPROVED              ONGOING              FINISHED
 ```
 
 ---
 
-## ✨ Fitur Utama
+## Fitur Utama
 
-### 🔐 Authentication & Authorization
+### Authentication dan Authorization
 - JWT-based authentication
 - Role-based access control (RBAC)
 - 4 Role: MAHASISWA, SARPRAS, SECURITY, ADMIN
 
-### 📦 Master Data Management
+### Master Data Management
 - CRUD Ruangan (kapasitas, lokasi, deskripsi)
 - CRUD Barang (stok, lokasi penyimpanan)
-- Manajemen Organisasi (HMJ, UKM, BEM, MPM)
+- Manajemen Organisasi (ORMAWA, UKM)
 
-### 📝 Peminjaman
+### Peminjaman
 - Pengajuan peminjaman ruangan/barang
 - Upload surat digital ke Supabase Storage
 - Multi-item peminjaman (ruangan + barang)
 - Verifikasi oleh petugas sarpras
-- Status tracking (PENDING → APPROVED → ONGOING → FINISHED)
+- Pembatalan peminjaman yang sudah disetujui
+- Status tracking (PENDING, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED)
 
-### 👥 Kehadiran
+### Kehadiran
 - Verifikasi kehadiran oleh security
 - Riwayat kehadiran peminjam
 - Status kehadiran (HADIR, TIDAK_HADIR, BATAL)
 
-### 🔔 Notifikasi
-- Auto-notifikasi saat pengajuan dibuat
-- Notifikasi status approved/rejected
-- Reminder kehadiran
-- Real-time notification count
+### Email Notification
+- Notifikasi email otomatis via Gmail API
+- Notifikasi saat pengajuan baru dibuat (ke Sarpras)
+- Notifikasi status approved/rejected (ke Mahasiswa)
+- Notifikasi kehadiran (ke Security)
+- Notifikasi pembatalan peminjaman
 
-### 📊 Laporan
+### Laporan dan Export
 - Laporan peminjaman (filter by date, status)
 - Laporan kehadiran
+- Export laporan ke Excel
 - Log aktivitas sistem
 
 ---
 
-## 🛠 Teknologi
+## Teknologi
 
 ### Backend
-- **Language**: Go 1.25.3 (Native, no framework)
+- **Language**: Go 1.25.3 (Native, tanpa framework)
 - **Database**: PostgreSQL (Supabase)
 - **Authentication**: JWT (golang-jwt/jwt)
 - **Password Hashing**: bcrypt (golang.org/x/crypto)
 - **Database Driver**: pgx/v5
+- **Email**: Gmail API (google.golang.org/api/gmail)
+- **Excel Export**: excelize
 
 ### Storage
 - **File Storage**: Supabase Storage
@@ -97,62 +102,91 @@ Sistem web-based untuk mengelola peminjaman ruangan dan barang di lingkungan kam
 
 ---
 
-## 📁 Struktur Project
+## Struktur Project
 
 ```
-new-backend/
+proyek-2-backend/
 ├── cmd/
-│   └── server/
-│       └── main.go              # Entry point aplikasi
+│   ├── server/
+│   │   └── main.go                    # Entry point aplikasi
+│   └── oauth_token/                   # Tool untuk generate Gmail OAuth token
 ├── internal/
 │   ├── config/
-│   │   ├── config.go            # Environment configuration
-│   │   └── supabase.go          # Supabase storage config
+│   │   ├── config.go                  # Environment configuration
+│   │   ├── gmail.go                   # Gmail API configuration
+│   │   └── supabase.go                # Supabase storage config
 │   ├── db/
-│   │   └── db.go                # Database connection
+│   │   └── db.go                      # Database connection
 │   ├── router/
-│   │   └── router.go            # HTTP routing & middleware setup
+│   │   └── router.go                  # HTTP routing dan middleware setup
 │   └── services/
-│       └── storage_service.go   # Supabase storage operations
-├── models/                       # Domain models & DTOs
+│       ├── email_service.go           # Gmail API email sending
+│       ├── email_templates.go         # HTML email templates
+│       ├── status_scheduler.go        # Auto-update status scheduler
+│       └── storage_service.go         # Supabase storage operations
+├── models/                            # Domain models dan DTOs
 │   ├── user.go
 │   ├── peminjaman.go
 │   ├── ruangan.go
 │   ├── barang.go
 │   ├── kehadiran.go
-│   ├── notifikasi.go
-│   └── enums.go                 # Enum definitions
-├── repositories/                 # Data access layer (CRUD)
+│   ├── kegiatan.go
+│   ├── organisasi.go
+│   ├── mailbox.go                     # Email notification log
+│   ├── log_aktivitas.go
+│   └── enums.go                       # Enum definitions
+├── repositories/                      # Data access layer (CRUD)
 │   ├── user_repository.go
 │   ├── peminjaman_repository.go
 │   ├── ruangan_repository.go
 │   ├── barang_repository.go
 │   ├── kehadiran_repository.go
-│   └── notifikasi_repository.go
-├── services/                     # Business logic layer
+│   ├── kegiatan_repository.go
+│   ├── organisasi_repository.go
+│   ├── mailbox_repository.go
+│   └── log_aktivitas_repository.go
+├── services/                          # Business logic layer
 │   ├── auth_service.go
 │   ├── peminjaman_service.go
 │   ├── kehadiran_service.go
+│   ├── export_service.go
 │   └── code_generator.go
-├── handlers/                     # HTTP handlers (controllers)
+├── handlers/                          # HTTP handlers (controllers)
 │   ├── auth_handler.go
 │   ├── peminjaman_handler.go
 │   ├── ruangan_handler.go
 │   ├── barang_handler.go
 │   ├── kehadiran_handler.go
-│   └── notifikasi_handler.go
-├── middleware/                   # HTTP middleware
-│   ├── auth.go                  # JWT validation & role checking
-│   └── cors.go                  # CORS configuration
-├── migrations/                   # SQL migration files
-│   ├── 001_init_schema.sql
-│   ├── erd_new_proyek_2.sql     # Current schema (with triggers)
-│   └── 002_auto_generate_codes.sql
-├── docs/                         # Documentation
-│   └── FIX_KODE_USER_FORMAT.md
-├── .air.toml                     # Air configuration
-├── .env                          # Environment variables (gitignored)
-├── .gitignore
+│   ├── export_handler.go
+│   ├── organisasi_handler.go
+│   ├── log_aktivitas_handler.go
+│   └── info_handler.go
+├── middleware/                        # HTTP middleware
+│   ├── auth.go                        # JWT validation dan role checking
+│   └── cors.go                        # CORS configuration
+├── migrations/                        # SQL migration files
+│   ├── erd_new_proyek_2.sql           # Current schema (with triggers)
+│   ├── 002_auto_generate_codes.sql
+│   ├── 004_redesign_mailbox.sql
+│   └── schema_database.sql
+├── docs/                              # Documentation
+│   ├── diagrams/                      # UML diagrams
+│   │   ├── use_case_diagram.puml      # PlantUML Use Case
+│   │   ├── class_diagram.md           # Mermaid Class Diagram
+│   │   ├── sequence_diagram.md        # Mermaid Sequence Diagrams
+│   │   └── flowchart_diagram.md       # Mermaid Flowcharts
+│   ├── bpmn/                          # BPMN business process diagrams
+│   ├── product_backlog.md
+│   ├── sprint_planning.md
+│   └── ...
+├── .air.toml                          # Air configuration (default)
+├── .air.windows.toml                  # Air configuration (Windows)
+├── .air.linux.toml                    # Air configuration (Linux)
+├── run-air.bat                        # Air wrapper script (Windows)
+├── run-air.sh                         # Air wrapper script (Linux)
+├── .env                               # Environment variables (gitignored)
+├── .env.example                       # Environment variables template
+├── gmail_token.json                   # Gmail OAuth token (gitignored)
 ├── go.mod
 ├── go.sum
 └── README.md
@@ -160,19 +194,20 @@ new-backend/
 
 ---
 
-## 🚀 Setup & Installation
+## Setup dan Installation
 
 ### Prerequisites
 
-- Go 1.25.3 or higher
+- Go 1.25.3 atau lebih tinggi
 - PostgreSQL database (Supabase account)
 - Git
+- Google Cloud Console account (untuk Gmail API)
 
 ### 1. Clone Repository
 
 ```bash
 git clone <repository-url>
-cd new-backend
+cd proyek-2-backend
 ```
 
 ### 2. Install Dependencies
@@ -188,6 +223,7 @@ go mod download
 3. Jalankan migration file:
    - `migrations/erd_new_proyek_2.sql` (schema utama)
    - `migrations/002_auto_generate_codes.sql` (triggers untuk auto-generate kode)
+   - `migrations/004_redesign_mailbox.sql` (mailbox untuk email logging)
 
 ### 4. Setup Supabase Storage
 
@@ -195,9 +231,23 @@ go mod download
 2. Buat bucket baru: `surat-digital`
 3. Set policy untuk bucket (public read, authenticated write)
 
-### 5. Environment Variables
+### 5. Setup Gmail API (Optional)
 
-Buat file `.env` di root project:
+Untuk mengaktifkan fitur notifikasi email:
+
+1. Buat project di [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Gmail API
+3. Buat OAuth 2.0 credentials (Desktop app)
+4. Download `credentials.json` dan letakkan di root project
+5. Jalankan token generator:
+   ```bash
+   go run cmd/oauth_token/main.go
+   ```
+6. Ikuti instruksi untuk generate `gmail_token.json`
+
+### 6. Environment Variables
+
+Buat file `.env` berdasarkan `.env.example`:
 
 ```env
 # Database
@@ -206,7 +256,7 @@ DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres
 # Server
 PORT=8000
 
-# JWT Secret (GANTI DI PRODUCTION!)
+# JWT Secret
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
 
 # Supabase Storage
@@ -220,22 +270,30 @@ MAX_UPLOAD_SIZE_MB=2
 
 # CORS
 CORS_ALLOWED_ORIGIN=*
+
+# Gmail API (Optional - untuk notifikasi email)
+GMAIL_CREDENTIALS_FILE=credentials.json
+GMAIL_TOKEN_FILE=gmail_token.json
+GMAIL_SENDER_EMAIL=your-email@gmail.com
 ```
 
-**Cara mendapatkan credentials:**
-- `DATABASE_URL`: Supabase Dashboard → Settings → Database → Connection String (URI)
-- `SUPABASE_SERVICE_KEY`: Supabase Dashboard → Settings → API → service_role key
-
-### 6. Run Server
+### 7. Run Server
 
 #### Development (with hot reload)
 
 ```bash
 # Install Air (jika belum)
-go install github.com/cosmtrek/air@latest
+go install github.com/air-verse/air@latest
 
 # Run with Air
 air
+
+# Atau menggunakan script wrapper
+# Windows:
+run-air.bat
+
+# Linux/macOS:
+./run-air.sh
 ```
 
 #### Production
@@ -246,34 +304,24 @@ go run cmd/server/main.go
 
 Server akan berjalan di `http://localhost:8000`
 
-### 7. Test API
+### 8. Test API
 
 ```bash
 # Health check
 curl http://localhost:8000/api/health
 
-# Register user
-curl -X POST http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nama": "John Doe",
-    "email": "john@example.com",
-    "password": "password123",
-    "role": "MAHASISWA"
-  }'
-
 # Login
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "john@example.com",
+    "email": "admin@example.com",
     "password": "password123"
   }'
 ```
 
 ---
 
-## 📚 API Documentation
+## API Documentation
 
 ### Base URL
 ```
@@ -289,16 +337,19 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### Endpoints
 
-#### 🔓 Public Endpoints
+#### Public Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/auth/login` | Login user |
-| POST | `/auth/register` | Register user baru |
+| POST | `/auth/register` | Register user baru (hanya oleh SARPRAS) |
 | GET | `/health` | Health check |
 | GET | `/info` | Info umum sistem |
+| GET | `/organisasi` | List organisasi (untuk dropdown register) |
+| GET | `/jadwal-ruangan` | Jadwal ruangan publik |
+| GET | `/jadwal-aktif` | Jadwal aktif hari ini |
 
-#### 🔐 Protected Endpoints
+#### Protected Endpoints
 
 ##### Master Data - Ruangan
 
@@ -306,6 +357,7 @@ Authorization: Bearer <JWT_TOKEN>
 |--------|----------|------|-------------|
 | GET | `/ruangan` | All | List semua ruangan |
 | GET | `/ruangan/{id}` | All | Detail ruangan |
+| GET | `/ruangan/{id}/booked-dates` | All | Tanggal yang sudah dibooking |
 | POST | `/ruangan/create` | SARPRAS, ADMIN | Tambah ruangan |
 | PUT | `/ruangan/{id}` | SARPRAS, ADMIN | Update ruangan |
 | DELETE | `/ruangan/{id}` | SARPRAS, ADMIN | Hapus ruangan |
@@ -329,12 +381,12 @@ Authorization: Bearer <JWT_TOKEN>
 | GET | `/peminjaman/{id}` | All | Detail peminjaman |
 | GET | `/peminjaman/pending` | SARPRAS, ADMIN | List pengajuan pending |
 | POST | `/peminjaman/{id}/verifikasi` | SARPRAS, ADMIN | Verifikasi peminjaman |
+| POST | `/peminjaman/{id}/cancel` | SARPRAS, ADMIN | Batalkan peminjaman |
 | POST | `/peminjaman/{id}/upload-surat` | Authenticated | Upload surat digital |
 | GET | `/peminjaman/{id}/surat` | Authenticated | Get signed URL surat |
-| GET | `/jadwal-ruangan` | All | Jadwal ruangan (calendar) |
-| GET | `/jadwal-aktif` | SECURITY, ADMIN | Jadwal aktif untuk security |
 | GET | `/jadwal-aktif-belum-verifikasi` | SECURITY, ADMIN | Jadwal belum verifikasi kehadiran |
 | GET | `/laporan/peminjaman` | SARPRAS, ADMIN | Laporan peminjaman |
+| GET | `/laporan/peminjaman/export` | SARPRAS, ADMIN | Export laporan ke Excel |
 
 ##### Kehadiran
 
@@ -344,14 +396,6 @@ Authorization: Bearer <JWT_TOKEN>
 | GET | `/laporan/kehadiran` | SARPRAS, SECURITY, ADMIN | Laporan kehadiran |
 | GET | `/kehadiran-riwayat` | SECURITY, ADMIN | Riwayat kehadiran by security |
 
-##### Notifikasi
-
-| Method | Endpoint | Role | Description |
-|--------|----------|------|-------------|
-| GET | `/notifikasi/me` | Authenticated | List notifikasi user |
-| GET | `/notifikasi/count` | Authenticated | Jumlah notifikasi belum dibaca |
-| PATCH | `/notifikasi/{id}/dibaca` | Authenticated | Tandai notifikasi sebagai dibaca |
-
 ##### Log Aktivitas
 
 | Method | Endpoint | Role | Description |
@@ -359,34 +403,6 @@ Authorization: Bearer <JWT_TOKEN>
 | GET | `/log-aktivitas` | ADMIN | List semua log aktivitas |
 
 ### Request/Response Examples
-
-#### Register User
-
-**Request:**
-```json
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "nama": "John Doe",
-  "email": "john@example.com",
-  "password": "password123",
-  "role": "MAHASISWA",
-  "organisasi_kode": "ORG-0001"
-}
-```
-
-**Response:**
-```json
-{
-  "kode_user": "USR-251204-0001",
-  "nama": "John Doe",
-  "email": "john@example.com",
-  "role": "MAHASISWA",
-  "organisasi_kode": "ORG-0001",
-  "created_at": "2025-12-04T08:00:00Z"
-}
-```
 
 #### Login
 
@@ -425,10 +441,10 @@ Content-Type: application/json
 
 {
   "kode_ruangan": "RNG-0001",
+  "nama_kegiatan": "Rapat Organisasi",
+  "deskripsi": "Rapat bulanan",
   "tanggal_mulai": "2025-12-10T08:00:00Z",
   "tanggal_selesai": "2025-12-10T12:00:00Z",
-  "keperluan": "Rapat Organisasi",
-  "path_surat_digital": "surat/2025/12/surat-peminjaman.pdf",
   "barang": [
     {
       "kode_barang": "BRG-0001",
@@ -444,18 +460,17 @@ Content-Type: application/json
   "kode_peminjaman": "PMJ-251204-0001",
   "kode_user": "USR-251204-0001",
   "kode_ruangan": "RNG-0001",
+  "kode_kegiatan": "KGT-251204-0001",
   "tanggal_mulai": "2025-12-10T08:00:00Z",
   "tanggal_selesai": "2025-12-10T12:00:00Z",
-  "keperluan": "Rapat Organisasi",
   "status": "PENDING",
-  "path_surat_digital": "surat/2025/12/surat-peminjaman.pdf",
   "created_at": "2025-12-04T08:00:00Z"
 }
 ```
 
 ---
 
-## 🗄 Database Schema
+## Database Schema
 
 ### Tabel Utama
 
@@ -466,6 +481,7 @@ nama            VARCHAR
 email           VARCHAR UNIQUE
 password_hash   VARCHAR
 role            role_enum            -- MAHASISWA, SARPRAS, SECURITY, ADMIN
+no_hp           VARCHAR
 organisasi_kode VARCHAR FK
 created_at      TIMESTAMP
 ```
@@ -478,7 +494,6 @@ kode_ruangan         VARCHAR FK
 kode_kegiatan        VARCHAR FK
 tanggal_mulai        TIMESTAMP
 tanggal_selesai      TIMESTAMP
-keperluan            TEXT
 status               peminjaman_status_enum
 path_surat_digital   TEXT
 verified_by          VARCHAR FK
@@ -488,22 +503,13 @@ created_at           TIMESTAMP
 updated_at           TIMESTAMP
 ```
 
-#### ruangan
+#### mailbox
 ```sql
-kode_ruangan    VARCHAR PRIMARY KEY  -- Format: RNG-0001
-nama_ruangan    VARCHAR
-lokasi          VARCHAR
-kapasitas       INT
-deskripsi       TEXT
-```
-
-#### barang
-```sql
-kode_barang     VARCHAR PRIMARY KEY  -- Format: BRG-0001
-nama_barang     VARCHAR
-deskripsi       TEXT
-jumlah_total    INT
-ruangan_kode    VARCHAR FK
+kode_mailbox     VARCHAR PRIMARY KEY  -- Format: MBX-YYMMDD-0001
+kode_user        VARCHAR FK           -- Penerima notifikasi
+kode_peminjaman  VARCHAR FK
+jenis_pesan      VARCHAR              -- APPROVED, REJECTED, CANCELLED, etc.
+created_at       TIMESTAMP
 ```
 
 ### Database Triggers
@@ -514,40 +520,42 @@ Sistem menggunakan database triggers untuk auto-generate kode dengan format yang
 - **`generate_kode_peminjaman()`**: Generate `PMJ-YYMMDD-0001`
 - **`generate_kode_ruangan()`**: Generate `RNG-0001`
 - **`generate_kode_barang()`**: Generate `BRG-0001`
-
-Lihat `migrations/002_auto_generate_codes.sql` untuk detail implementasi.
+- **`generate_kode_mailbox()`**: Generate `MBX-YYMMDD-0001`
 
 ---
 
-## 👥 Role & Permissions
+## Role dan Permissions
 
 ### MAHASISWA
-- ✅ Melihat jadwal ruangan
-- ✅ Mengajukan peminjaman
-- ✅ Upload surat digital
-- ✅ Melihat riwayat peminjaman sendiri
-- ✅ Menerima notifikasi status peminjaman
+- Melihat jadwal ruangan
+- Mengajukan peminjaman
+- Upload surat digital
+- Melihat riwayat peminjaman sendiri
+- Menerima notifikasi email status peminjaman
 
-### SARPRAS (Sarana Prasarana)
-- ✅ Semua akses MAHASISWA
-- ✅ Kelola master data (ruangan, barang)
-- ✅ Verifikasi pengajuan peminjaman (approve/reject)
-- ✅ Melihat laporan peminjaman
-- ✅ Melihat semua pengajuan pending
+### SARPRAS (Sarana Prasarana / Admin)
+- Registrasi user baru
+- Kelola master data (ruangan, barang, organisasi)
+- Verifikasi pengajuan peminjaman (approve/reject)
+- Membatalkan peminjaman yang sudah disetujui
+- Melihat laporan peminjaman
+- Export laporan ke Excel
+- Melihat log aktivitas
 
 ### SECURITY
-- ✅ Melihat jadwal peminjaman aktif
-- ✅ Mencatat kehadiran peminjam
-- ✅ Melihat riwayat kehadiran
-- ✅ Melihat jadwal yang belum diverifikasi kehadirannya
+- Melihat jadwal peminjaman aktif
+- Mencatat kehadiran peminjam
+- Melihat riwayat kehadiran
+- Melihat jadwal yang belum diverifikasi kehadirannya
+- Menerima notifikasi email untuk jadwal aktif
 
 ### ADMIN
-- ✅ **Semua akses** (full access)
-- ✅ Melihat log aktivitas sistem
+- Semua akses (full access)
+- Melihat log aktivitas sistem
 
 ---
 
-## 💻 Development
+## Development
 
 ### Hot Reload dengan Air
 
@@ -561,46 +569,28 @@ Project ini mendukung Air untuk Windows dan Linux dengan konfigurasi terpisah:
 #### Install Air
 
 ```bash
-# Windows/Linux/macOS
 go install github.com/air-verse/air@latest
 ```
 
-> **Note untuk Linux**: Pastikan `~/go/bin` sudah ada di PATH. Untuk Fish shell:
-> ```bash
-> fish_add_path ~/go/bin
-> ```
-
 #### Menjalankan Air
 
-**Opsi 1: Menggunakan Script Wrapper (Rekomendasi)**
 ```bash
+# Menggunakan Script Wrapper (Rekomendasi)
 # Linux/macOS
 ./run-air.sh
 
 # Windows
 run-air.bat
+
+# Atau manually dengan config file
+air -c .air.windows.toml  # Windows
+air -c .air.linux.toml    # Linux
 ```
 
-**Opsi 2: Manually dengan config file**
-```bash
-# Linux/macOS
-air -c .air.linux.toml
-
-# Windows
-air -c .air.windows.toml
-```
-
-**Opsi 3: Default config (sesuaikan dengan OS)**
-```bash
-air
-```
-
-### Code Structure Guidelines
-
-#### Layered Architecture
+### Layered Architecture
 
 ```
-Handler → Service → Repository → Database
+Handler -> Service -> Repository -> Database
 ```
 
 - **Handlers**: HTTP request/response handling
@@ -608,7 +598,7 @@ Handler → Service → Repository → Database
 - **Repositories**: Database operations
 - **Models**: Data structures
 
-#### Naming Conventions
+### Naming Conventions
 
 - **Kode**: `PREFIX-YYMMDD-0001` atau `PREFIX-0001`
   - User: `USR-251204-0001`
@@ -637,7 +627,7 @@ go test -run TestFunctionName ./path/to/package
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Issue: Kode User Format Salah
 
@@ -677,6 +667,16 @@ go test -run TestFunctionName ./path/to/package
 3. Cek policy bucket (authenticated write)
 4. Verifikasi file size < `MAX_UPLOAD_SIZE_MB`
 
+### Issue: Email Notification Tidak Terkirim
+
+**Problem**: Email tidak terkirim setelah verifikasi
+
+**Solution**:
+1. Pastikan Gmail API sudah di-enable di Google Cloud Console
+2. Cek `credentials.json` dan `gmail_token.json` sudah ada
+3. Verifikasi `GMAIL_SENDER_EMAIL` di `.env`
+4. Cek log server untuk error detail
+
 ### Issue: CORS Error
 
 **Problem**: CORS error dari frontend
@@ -688,26 +688,21 @@ go test -run TestFunctionName ./path/to/package
 
 ---
 
-## 📝 License
+## License
 
 MIT License - feel free to use this project for learning purposes.
 
 ---
 
-## 👨‍💻 Contributors
+## Contributors
 
-- **Developer**: [Your Name]
 - **Project**: Proyek 2 - Sistem Informasi Peminjaman Sarpras
+- **Institution**: Politeknik Negeri Bandung
 
 ---
 
-## 📞 Support
+## Support
 
 Jika ada pertanyaan atau issue:
 1. Buka issue di repository
 2. Lihat dokumentasi di folder `docs/`
-3. Contact: [your-email@example.com]
-
----
-
-**Happy Coding! 🚀**

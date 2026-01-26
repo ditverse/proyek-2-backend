@@ -1,0 +1,117 @@
+@startuml Sistem Peminjaman Sarana Prasarana Kampus
+
+left to right direction
+skinparam packageStyle rectangle
+
+title Use Case Diagram - Sistem Peminjaman Sarana Prasarana Kampus
+
+' ========================================
+' ACTORS
+' ========================================
+actor "Guest" as Guest
+actor "Mahasiswa" as Mahasiswa
+actor "Petugas Sarpras\n(Admin)" as Sarpras
+actor "Petugas Security" as Security
+
+' ========================================
+' SYSTEM BOUNDARY
+' ========================================
+rectangle "Sistem Peminjaman Sarana Prasarana Kampus" {
+
+    ' --- Group: Akses & Autentikasi ---
+    package "Akses & Autentikasi" {
+        usecase "Login" as UC_Login
+        usecase "Registrasi User Baru" as UC_Register
+        usecase "Logout" as UC_Logout
+    }
+    
+    ' --- Group: Informasi Publik ---
+    package "Informasi Publik" {
+        usecase "Melihat Jadwal Ruangan" as UC_JadwalRuangan
+    }
+
+    ' --- Group: Peminjaman (Mahasiswa) ---
+    package "Peminjaman" {
+        usecase "Mengajukan Peminjaman" as UC_AjukanPeminjaman
+        usecase "Upload Surat Digital" as UC_UploadSurat
+        usecase "Melihat Riwayat Peminjaman" as UC_RiwayatPeminjaman
+        usecase "Membatalkan Peminjaman" as UC_BatalPeminjaman
+    }
+
+    ' --- Group: Verifikasi & Laporan (Sarpras) ---
+    package "Verifikasi & Laporan" {
+        usecase "Melihat Daftar Pengajuan Pending" as UC_DaftarPending
+        usecase "Verifikasi Peminjaman" as UC_VerifikasiPeminjaman
+        usecase "Export Laporan Peminjaman" as UC_ExportLaporan
+        usecase "Melihat Log Aktivitas" as UC_LogAktivitas
+    }
+
+    ' --- Group: Manajemen Master Data (Sarpras) ---
+    package "Master Data" {
+        usecase "Kelola Ruangan" as UC_KelolaRuangan
+        usecase "Kelola Barang" as UC_KelolaBarang
+        usecase "Kelola Organisasi" as UC_KelolaOrganisasi
+    }
+
+    ' --- Group: Operasional Kehadiran (Security) ---
+    package "Kehadiran" {
+        usecase "Melihat Jadwal Aktif Hari Ini" as UC_JadwalAktif
+        usecase "Melihat Jadwal Belum Verifikasi" as UC_BelumVerifikasi
+        usecase "Verifikasi Kehadiran" as UC_VerifikasiKehadiran
+        usecase "Melihat Riwayat Kehadiran" as UC_RiwayatKehadiran
+    }
+
+    ' --- Group: Notifikasi ---
+    package "Fitur Umum" {
+        usecase "Melihat Notifikasi" as UC_LihatNotifikasi
+        usecase "Menandai Notifikasi Dibaca" as UC_TandaiDibaca
+    }
+}
+
+' ========================================
+' RELATIONSHIPS
+' ========================================
+
+' --- Guest ---
+Guest -- UC_JadwalRuangan
+Guest -- UC_Login
+
+' --- Mahasiswa ---
+Mahasiswa -- UC_Login
+Mahasiswa -- UC_Logout
+Mahasiswa -- UC_JadwalRuangan
+Mahasiswa -- UC_AjukanPeminjaman
+Mahasiswa -- UC_RiwayatPeminjaman
+Mahasiswa -- UC_BatalPeminjaman
+Mahasiswa -- UC_LihatNotifikasi
+
+' --- Sarpras (Admin) ---
+Sarpras -- UC_Login
+Sarpras -- UC_Logout
+Sarpras -- UC_JadwalRuangan
+Sarpras -- UC_DaftarPending
+Sarpras -- UC_VerifikasiPeminjaman
+Sarpras -- UC_ExportLaporan
+Sarpras -- UC_LogAktivitas
+Sarpras -- UC_KelolaRuangan
+Sarpras -- UC_KelolaBarang
+Sarpras -- UC_KelolaOrganisasi
+Sarpras -- UC_Register
+
+' --- Security ---
+Security -- UC_Login
+Security -- UC_Logout
+Security -- UC_JadwalAktif
+Security -- UC_BelumVerifikasi
+Security -- UC_VerifikasiKehadiran
+Security -- UC_RiwayatKehadiran
+
+' ========================================
+' INCLUDE & EXTEND
+' ========================================
+UC_AjukanPeminjaman ..> UC_UploadSurat : <<include>>
+UC_VerifikasiPeminjaman ..> UC_DaftarPending : <<include>>
+UC_LihatNotifikasi ..> UC_TandaiDibaca : <<include>>
+UC_BatalPeminjaman ..> UC_RiwayatPeminjaman : <<extend>>
+
+@enduml

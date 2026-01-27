@@ -1,0 +1,1127 @@
+openapi: 3.0.3
+info:
+  title: Sistem Peminjaman Sarana Prasarana Kampus API
+  description: |
+    REST API untuk sistem peminjaman ruangan dan barang kampus.
+    
+    ## Authentication
+    API menggunakan JWT Bearer Token untuk autentikasi. Token diperoleh dari endpoint `/auth/login`.
+    
+    ## Base URL
+    - Development: `http://localhost:8000/api`
+    - Production: `https://your-domain.com/api`
+  version: 1.0.0
+  contact:
+    name: Developer Team
+    email: developer@example.com
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development Server
+
+tags:
+  - name: Authentication
+    description: Login dan registrasi user
+  - name: Ruangan
+    description: Manajemen master data ruangan
+  - name: Barang
+    description: Manajemen master data barang
+  - name: Peminjaman
+    description: Pengajuan dan verifikasi peminjaman
+  - name: Kehadiran
+    description: Pencatatan kehadiran peminjam
+  - name: Organisasi
+    description: Data organisasi kemahasiswaan
+  - name: Laporan
+    description: Export dan laporan data
+
+paths:
+  # ==========================================
+  # AUTHENTICATION
+  # ==========================================
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Autentikasi user dan mendapatkan JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Registrasi user baru
+      description: Hanya dapat dilakukan oleh SARPRAS/ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registrasi berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Email sudah terdaftar atau data tidak valid
+        '403':
+          description: Tidak memiliki akses
+
+  # ==========================================
+  # RUANGAN
+  # ==========================================
+  /ruangan:
+    get:
+      tags:
+        - Ruangan
+      summary: List semua ruangan
+      responses:
+        '200':
+          description: Daftar ruangan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ruangan'
+
+  /ruangan/create:
+    post:
+      tags:
+        - Ruangan
+      summary: Tambah ruangan baru
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuanganRequest'
+      responses:
+        '201':
+          description: Ruangan berhasil ditambahkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruangan'
+        '403':
+          description: Tidak memiliki akses (hanya SARPRAS/ADMIN)
+
+  /ruangan/{kode}:
+    get:
+      tags:
+        - Ruangan
+      summary: Detail ruangan
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+          example: RNG-0001
+      responses:
+        '200':
+          description: Detail ruangan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruangan'
+        '404':
+          description: Ruangan tidak ditemukan
+    put:
+      tags:
+        - Ruangan
+      summary: Update ruangan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuanganRequest'
+      responses:
+        '200':
+          description: Ruangan berhasil diupdate
+        '403':
+          description: Tidak memiliki akses
+    delete:
+      tags:
+        - Ruangan
+      summary: Hapus ruangan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ruangan berhasil dihapus
+        '403':
+          description: Tidak memiliki akses
+
+  /ruangan/{kode}/booked-dates:
+    get:
+      tags:
+        - Ruangan
+      summary: Tanggal yang sudah dibooking
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-01-01"
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-01-31"
+      responses:
+        '200':
+          description: Daftar tanggal yang sudah dibooking
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookedDate'
+
+  # ==========================================
+  # BARANG
+  # ==========================================
+  /barang:
+    get:
+      tags:
+        - Barang
+      summary: List semua barang
+      responses:
+        '200':
+          description: Daftar barang
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Barang'
+
+  /barang/create:
+    post:
+      tags:
+        - Barang
+      summary: Tambah barang baru
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBarangRequest'
+      responses:
+        '201':
+          description: Barang berhasil ditambahkan
+        '403':
+          description: Tidak memiliki akses
+
+  /barang/{kode}:
+    get:
+      tags:
+        - Barang
+      summary: Detail barang
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detail barang
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Barang'
+    put:
+      tags:
+        - Barang
+      summary: Update barang
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBarangRequest'
+      responses:
+        '200':
+          description: Barang berhasil diupdate
+    delete:
+      tags:
+        - Barang
+      summary: Hapus barang
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Barang berhasil dihapus
+
+  # ==========================================
+  # PEMINJAMAN
+  # ==========================================
+  /peminjaman:
+    post:
+      tags:
+        - Peminjaman
+      summary: Buat pengajuan peminjaman
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePeminjamanRequest'
+      responses:
+        '201':
+          description: Peminjaman berhasil diajukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Peminjaman'
+        '400':
+          description: Ruangan tidak tersedia atau data tidak valid
+
+  /peminjaman/me:
+    get:
+      tags:
+        - Peminjaman
+      summary: List peminjaman milik user yang login
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar peminjaman user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peminjaman'
+
+  /peminjaman/pending:
+    get:
+      tags:
+        - Peminjaman
+      summary: List pengajuan pending
+      description: Hanya untuk SARPRAS/ADMIN
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Daftar peminjaman pending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peminjaman'
+        '403':
+          description: Tidak memiliki akses
+
+  /peminjaman/{kode}:
+    get:
+      tags:
+        - Peminjaman
+      summary: Detail peminjaman
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+          example: PMJ-260126-0001
+      responses:
+        '200':
+          description: Detail peminjaman
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Peminjaman'
+        '404':
+          description: Peminjaman tidak ditemukan
+
+  /peminjaman/{kode}/verifikasi:
+    post:
+      tags:
+        - Peminjaman
+      summary: Verifikasi peminjaman
+      description: Approve atau reject peminjaman (SARPRAS/ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifikasiRequest'
+      responses:
+        '200':
+          description: Verifikasi berhasil
+        '400':
+          description: Peminjaman sudah diverifikasi
+        '403':
+          description: Tidak memiliki akses
+
+  /peminjaman/{kode}/cancel:
+    post:
+      tags:
+        - Peminjaman
+      summary: Batalkan peminjaman
+      description: Membatalkan peminjaman APPROVED/ONGOING (SARPRAS/ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alasan:
+                  type: string
+                  example: "Ruangan diperlukan untuk kegiatan lain"
+      responses:
+        '200':
+          description: Peminjaman berhasil dibatalkan
+        '400':
+          description: Status tidak valid untuk dibatalkan
+
+  /peminjaman/{kode}/upload-surat:
+    post:
+      tags:
+        - Peminjaman
+      summary: Upload surat digital
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                surat:
+                  type: string
+                  format: binary
+                  description: File PDF (max 2MB)
+      responses:
+        '200':
+          description: Surat berhasil diupload
+        '400':
+          description: File tidak valid
+
+  /peminjaman/{kode}/surat:
+    get:
+      tags:
+        - Peminjaman
+      summary: Get signed URL surat digital
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: kode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Signed URL untuk download surat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signed_url:
+                    type: string
+                  path:
+                    type: string
+
+  # ==========================================
+  # JADWAL
+  # ==========================================
+  /jadwal-ruangan:
+    get:
+      tags:
+        - Peminjaman
+      summary: Jadwal ruangan (untuk calendar)
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Jadwal ruangan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JadwalRuangan'
+
+  /jadwal-aktif:
+    get:
+      tags:
+        - Peminjaman
+      summary: Jadwal aktif hari ini
+      responses:
+        '200':
+          description: Jadwal aktif
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peminjaman'
+
+  /jadwal-aktif-belum-verifikasi:
+    get:
+      tags:
+        - Kehadiran
+      summary: Jadwal yang belum diverifikasi kehadirannya
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Jadwal belum verifikasi kehadiran
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peminjaman'
+
+  # ==========================================
+  # KEHADIRAN
+  # ==========================================
+  /kehadiran:
+    post:
+      tags:
+        - Kehadiran
+      summary: Catat kehadiran peminjam
+      description: Hanya untuk SECURITY/ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKehadiranRequest'
+      responses:
+        '201':
+          description: Kehadiran berhasil dicatat
+        '400':
+          description: Peminjaman tidak ditemukan atau sudah dicatat
+        '403':
+          description: Tidak memiliki akses
+
+  /kehadiran-riwayat:
+    get:
+      tags:
+        - Kehadiran
+      summary: Riwayat kehadiran yang dicatat oleh security
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Riwayat kehadiran
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Kehadiran'
+
+  # ==========================================
+  # LAPORAN
+  # ==========================================
+  /laporan/peminjaman:
+    get:
+      tags:
+        - Laporan
+      summary: Laporan peminjaman
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED]
+      responses:
+        '200':
+          description: Laporan peminjaman
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Peminjaman'
+
+  /laporan/peminjaman/export:
+    get:
+      tags:
+        - Laporan
+      summary: Export laporan ke Excel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /laporan/kehadiran:
+    get:
+      tags:
+        - Laporan
+      summary: Laporan kehadiran
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Laporan kehadiran
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Kehadiran'
+
+  # ==========================================
+  # ORGANISASI
+  # ==========================================
+  /organisasi:
+    get:
+      tags:
+        - Organisasi
+      summary: List semua organisasi
+      responses:
+        '200':
+          description: Daftar organisasi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Organisasi'
+
+  # ==========================================
+  # LOG AKTIVITAS
+  # ==========================================
+  /log-aktivitas:
+    get:
+      tags:
+        - Laporan
+      summary: Log aktivitas sistem
+      description: Hanya untuk ADMIN
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Log aktivitas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogAktivitas'
+
+  # ==========================================
+  # HEALTH CHECK
+  # ==========================================
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Server running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ==========================================
+    # REQUEST SCHEMAS
+    # ==========================================
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          example: password123
+
+    RegisterRequest:
+      type: object
+      required:
+        - nama
+        - email
+        - password
+        - role
+      properties:
+        nama:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role:
+          type: string
+          enum: [MAHASISWA, SARPRAS, SECURITY, ADMIN]
+        no_hp:
+          type: string
+        organisasi_kode:
+          type: string
+
+    CreateRuanganRequest:
+      type: object
+      required:
+        - nama_ruangan
+      properties:
+        nama_ruangan:
+          type: string
+          example: Aula Gedung A
+        lokasi:
+          type: string
+          example: Gedung A Lantai 1
+        kapasitas:
+          type: integer
+          example: 100
+        deskripsi:
+          type: string
+
+    CreateBarangRequest:
+      type: object
+      required:
+        - nama_barang
+      properties:
+        nama_barang:
+          type: string
+          example: Proyektor
+        deskripsi:
+          type: string
+        jumlah_total:
+          type: integer
+          example: 5
+        ruangan_kode:
+          type: string
+
+    CreatePeminjamanRequest:
+      type: object
+      required:
+        - tanggal_mulai
+        - tanggal_selesai
+      properties:
+        kode_ruangan:
+          type: string
+          example: RNG-0001
+        nama_kegiatan:
+          type: string
+          example: Rapat Bulanan
+        deskripsi:
+          type: string
+        tanggal_mulai:
+          type: string
+          format: date-time
+        tanggal_selesai:
+          type: string
+          format: date-time
+        barang:
+          type: array
+          items:
+            type: object
+            properties:
+              kode_barang:
+                type: string
+              jumlah:
+                type: integer
+
+    VerifikasiRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [APPROVED, REJECTED]
+        catatan_verifikasi:
+          type: string
+
+    CreateKehadiranRequest:
+      type: object
+      required:
+        - kode_peminjaman
+        - status_kehadiran
+      properties:
+        kode_peminjaman:
+          type: string
+        status_kehadiran:
+          type: string
+          enum: [HADIR, TIDAK_HADIR, BATAL]
+        keterangan:
+          type: string
+
+    # ==========================================
+    # RESPONSE SCHEMAS
+    # ==========================================
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    User:
+      type: object
+      properties:
+        kode_user:
+          type: string
+          example: USR-260126-0001
+        nama:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        no_hp:
+          type: string
+        organisasi_kode:
+          type: string
+        organisasi:
+          $ref: '#/components/schemas/Organisasi'
+        created_at:
+          type: string
+          format: date-time
+
+    Ruangan:
+      type: object
+      properties:
+        kode_ruangan:
+          type: string
+          example: RNG-0001
+        nama_ruangan:
+          type: string
+        lokasi:
+          type: string
+        kapasitas:
+          type: integer
+        deskripsi:
+          type: string
+
+    Barang:
+      type: object
+      properties:
+        kode_barang:
+          type: string
+          example: BRG-0001
+        nama_barang:
+          type: string
+        deskripsi:
+          type: string
+        jumlah_total:
+          type: integer
+        ruangan_kode:
+          type: string
+
+    Organisasi:
+      type: object
+      properties:
+        kode_organisasi:
+          type: string
+          example: ORG-0001
+        nama:
+          type: string
+        kontak:
+          type: string
+        jenis_organisasi:
+          type: string
+          enum: [ORMAWA, UKM]
+
+    Peminjaman:
+      type: object
+      properties:
+        kode_peminjaman:
+          type: string
+          example: PMJ-260126-0001
+        kode_user:
+          type: string
+        peminjam:
+          $ref: '#/components/schemas/User'
+        kode_ruangan:
+          type: string
+        ruangan:
+          $ref: '#/components/schemas/Ruangan'
+        kode_kegiatan:
+          type: string
+        kegiatan:
+          $ref: '#/components/schemas/Kegiatan'
+        tanggal_mulai:
+          type: string
+          format: date-time
+        tanggal_selesai:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, ONGOING, FINISHED, CANCELLED]
+        path_surat_digital:
+          type: string
+        verified_by:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+        catatan_verifikasi:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        barang:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeminjamanBarang'
+
+    PeminjamanBarang:
+      type: object
+      properties:
+        kode_peminjaman_barang:
+          type: string
+        kode_barang:
+          type: string
+        barang:
+          $ref: '#/components/schemas/Barang'
+        jumlah:
+          type: integer
+
+    Kegiatan:
+      type: object
+      properties:
+        kode_kegiatan:
+          type: string
+        nama_kegiatan:
+          type: string
+        deskripsi:
+          type: string
+        tanggal_mulai:
+          type: string
+          format: date-time
+        tanggal_selesai:
+          type: string
+          format: date-time
+        organisasi_kode:
+          type: string
+
+    Kehadiran:
+      type: object
+      properties:
+        kode_kehadiran:
+          type: string
+        kode_peminjaman:
+          type: string
+        status_kehadiran:
+          type: string
+          enum: [HADIR, TIDAK_HADIR, BATAL]
+        waktu_konfirmasi:
+          type: string
+          format: date-time
+        keterangan:
+          type: string
+        diverifikasi_oleh:
+          type: string
+
+    JadwalRuangan:
+      type: object
+      properties:
+        kode_peminjaman:
+          type: string
+        kode_ruangan:
+          type: string
+        nama_ruangan:
+          type: string
+        tanggal_mulai:
+          type: string
+          format: date-time
+        tanggal_selesai:
+          type: string
+          format: date-time
+        status:
+          type: string
+        peminjam:
+          type: string
+        organisasi:
+          type: string
+        nama_kegiatan:
+          type: string
+
+    BookedDate:
+      type: object
+      properties:
+        tanggal_mulai:
+          type: string
+          format: date-time
+        tanggal_selesai:
+          type: string
+          format: date-time
+        status:
+          type: string
+
+    LogAktivitas:
+      type: object
+      properties:
+        kode_log:
+          type: string
+        kode_user:
+          type: string
+        kode_peminjaman:
+          type: string
+        aksi:
+          type: string
+        keterangan:
+          type: string
+        waktu:
+          type: string
+          format: date-time

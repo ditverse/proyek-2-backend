@@ -24,10 +24,10 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	barangRepo := repositories.NewBarangRepository(db)
 	peminjamanRepo := repositories.NewPeminjamanRepository(db)
 	kehadiranRepo := repositories.NewKehadiranRepository(db)
-	notifikasiRepo := repositories.NewNotifikasiRepository(db)
 	logRepo := repositories.NewLogAktivitasRepository(db)
 	organisasiRepo := repositories.NewOrganisasiRepository(db)
 	kegiatanRepo := repositories.NewKegiatanRepository(db)
+	mailboxRepo := repositories.NewMailboxRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
@@ -35,12 +35,12 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	peminjamanService := services.NewPeminjamanService(
 		peminjamanRepo,
 		barangRepo,
-		notifikasiRepo,
 		logRepo,
 		userRepo,
 		kegiatanRepo,
 		organisasiRepo,
 		ruanganRepo,
+		mailboxRepo,
 		emailService,
 	)
 	kehadiranService := services.NewKehadiranService(
@@ -78,7 +78,6 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 		kegiatanRepo,
 		exportService,
 	)
-	notifikasiHandler := handlers.NewNotifikasiHandler(notifikasiRepo)
 	logHandler := handlers.NewLogAktivitasHandler(logRepo)
 	infoHandler := handlers.InfoUmumHandler
 	organisasiHandler := handlers.NewOrganisasiHandler(organisasiRepo)
@@ -216,19 +215,6 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.Handle("/api/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.Create), "SECURITY", "ADMIN"))
 	mux.Handle("/api/laporan/kehadiran", withRole(http.HandlerFunc(kehadiranHandler.GetByPeminjamanID), "SARPRAS", "ADMIN", "SECURITY"))
 	mux.Handle("/api/kehadiran-riwayat", withRole(http.HandlerFunc(kehadiranHandler.GetRiwayatBySecurity), "SECURITY", "ADMIN"))
-
-	// Protected routes - Notifikasi
-	mux.Handle("/api/notifikasi/me", withAuth(http.HandlerFunc(notifikasiHandler.GetMyNotifikasi)))
-	mux.Handle("/api/notifikasi/count", withAuth(http.HandlerFunc(notifikasiHandler.GetUnreadCount)))
-	mux.HandleFunc("/api/notifikasi/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if len(path) > len("/api/notifikasi/") {
-			idOrAction := path[len("/api/notifikasi/"):]
-			if idOrAction == "dibaca" || path[len(path)-len("/dibaca"):] == "/dibaca" {
-				withAuth(http.HandlerFunc(notifikasiHandler.MarkAsRead)).ServeHTTP(w, r)
-			}
-		}
-	})
 
 	// Protected routes - Log Aktivitas
 	mux.Handle("/api/log-aktivitas", withRole(http.HandlerFunc(logHandler.GetAll), "ADMIN"))

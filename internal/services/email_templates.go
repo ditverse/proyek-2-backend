@@ -402,6 +402,11 @@ func GetSecurityEmailSubject(namaKegiatan string, tanggal time.Time) string {
 	return fmt.Sprintf("🔔 Jadwal Kegiatan: %s - %s", namaKegiatan, FormatDateShort(tanggal))
 }
 
+// GetCancelledEmailSubject returns subject for cancelled email
+func GetCancelledEmailSubject(namaKegiatan string) string {
+	return fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s", namaKegiatan)
+}
+
 // BuildCancelledEmailHTML builds HTML email for cancelled loan
 func BuildCancelledEmailHTML(data EmailTemplateData) string {
 	alasan := data.CatatanVerifikasi
@@ -487,6 +492,104 @@ func BuildCancelledEmailHTML(data EmailTemplateData) string {
 		FormatDateShort(data.TanggalMulai),
 		FormatDateShort(data.TanggalSelesai),
 		EscapeHTML(alasan),
+	)
+
+	return html
+}
+
+// GetNewSubmissionEmailSubject returns subject for new submission email
+func GetNewSubmissionEmailSubject(namaKegiatan string) string {
+	return fmt.Sprintf("📝 Pengajuan Peminjaman Baru: %s", namaKegiatan)
+}
+
+// BuildNewSubmissionEmailHTML builds HTML email for Sarpras notification
+func BuildNewSubmissionEmailHTML(data EmailTemplateData) string {
+	barangList := buildBarangListHTML(data.Barang)
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengajuan Peminjaman Baru</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+        .container { background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #17a2b8, #138496); color: white; padding: 20px; border-radius: 10px 10px 0 0; margin: -30px -30px 20px -30px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header .icon { font-size: 48px; margin-bottom: 10px; }
+        .section { background: #f8f9fa; border-left: 4px solid #17a2b8; padding: 15px; margin: 15px 0; border-radius: 0 5px 5px 0; }
+        .section-title { font-weight: bold; color: #17a2b8; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .info-row { display: flex; margin: 8px 0; }
+        .info-label { color: #666; min-width: 140px; }
+        .info-value { color: #333; font-weight: 500; }
+        .status-new { background: #d1ecf1; color: #0c5460; padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; }
+        .peminjam-box { background: #e2e3e5; border-left: 4px solid #6c757d; padding: 15px; margin: 15px 0; border-radius: 0 5px 5px 0; }
+        .barang-list { list-style: none; padding: 0; margin: 0; }
+        .barang-list li { padding: 8px 0; border-bottom: 1px solid #eee; }
+        .barang-list li:last-child { border-bottom: none; }
+        .action-box { background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 5px; margin: 25px 0; text-align: center; }
+        .action-title { color: #856404; font-weight: bold; margin-bottom: 10px; font-size: 16px; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">📝</div>
+            <h1>Pengajuan Baru</h1>
+        </div>
+        
+        <p>Halo <strong>Tim Sarpras</strong>,</p>
+        
+        <p>Terdapat pengajuan peminjaman fasilitas baru yang membutuhkan verifikasi Anda.</p>
+        
+        <div class="section">
+            <div class="section-title">📋 Informasi Pengajuan</div>
+            <div class="info-row"><span class="info-label">Kode Peminjaman</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-new">🆕 MENUNGGU VERIFIKASI</span></span></div>
+            <div class="info-row"><span class="info-label">Tanggal Pengajuan</span><span class="info-value">%s</span></div>
+        </div>
+        
+        <div class="peminjam-box">
+            <div class="section-title">👤 Data Peminjam</div>
+            <div class="info-row"><span class="info-label">Nama</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Organisasi</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">No. HP</span><span class="info-value">%s</span></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📝 Detail Kegiatan</div>
+            <div class="info-row"><span class="info-label">Nama Kegiatan</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Ruangan</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Lokasi</span><span class="info-value">%s</span></div>
+            <div class="info-row"><span class="info-label">Tanggal</span><span class="info-value">%s s/d %s</span></div>
+        </div>
+        
+        %s
+        
+        <div class="action-box">
+            <div class="action-title">⚡ Tindakan Diperlukan:</div>
+            <p style="margin: 0; color: #856404;">Silakan login ke dashboard sistem untuk melihat detail lengkap dan melakukan verifikasi (Setujui/Tolak).</p>
+        </div>
+        
+        <div class="footer">
+            <p>Email ini dikirim otomatis oleh Sistem Sarpras</p>
+        </div>
+    </div>
+</body>
+</html>`,
+		EscapeHTML(data.KodePeminjaman),
+		FormatDate(time.Now()), // Waktu pengajuan (saat ini)
+		EscapeHTML(data.NamaPeminjam),
+		EscapeHTML(data.NamaOrganisasi),
+		EscapeHTML(data.NoHPPeminjam),
+		EscapeHTML(data.NamaKegiatan),
+		EscapeHTML(data.NamaRuangan),
+		EscapeHTML(data.LokasiRuangan),
+		FormatDate(data.TanggalMulai),
+		FormatDate(data.TanggalSelesai),
+		barangList,
 	)
 
 	return html

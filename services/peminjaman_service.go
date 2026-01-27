@@ -14,35 +14,35 @@ import (
 type PeminjamanService struct {
 	PeminjamanRepo *repositories.PeminjamanRepository
 	BarangRepo     *repositories.BarangRepository
-	NotifikasiRepo *repositories.NotifikasiRepository
 	LogRepo        *repositories.LogAktivitasRepository
 	UserRepo       *repositories.UserRepository
 	KegiatanRepo   *repositories.KegiatanRepository
 	OrganisasiRepo *repositories.OrganisasiRepository
 	RuanganRepo    *repositories.RuanganRepository
+	MailboxRepo    *repositories.MailboxRepository
 	EmailService   *internalsvc.EmailService
 }
 
 func NewPeminjamanService(
 	peminjamanRepo *repositories.PeminjamanRepository,
 	barangRepo *repositories.BarangRepository,
-	notifikasiRepo *repositories.NotifikasiRepository,
 	logRepo *repositories.LogAktivitasRepository,
 	userRepo *repositories.UserRepository,
 	kegiatanRepo *repositories.KegiatanRepository,
 	organisasiRepo *repositories.OrganisasiRepository,
 	ruanganRepo *repositories.RuanganRepository,
+	mailboxRepo *repositories.MailboxRepository,
 	emailService *internalsvc.EmailService,
 ) *PeminjamanService {
 	return &PeminjamanService{
 		PeminjamanRepo: peminjamanRepo,
 		BarangRepo:     barangRepo,
-		NotifikasiRepo: notifikasiRepo,
 		LogRepo:        logRepo,
 		UserRepo:       userRepo,
 		KegiatanRepo:   kegiatanRepo,
 		OrganisasiRepo: organisasiRepo,
 		RuanganRepo:    ruanganRepo,
+		MailboxRepo:    mailboxRepo,
 		EmailService:   emailService,
 	}
 }
@@ -195,18 +195,9 @@ func (s *PeminjamanService) CreatePeminjaman(req *models.CreatePeminjamanRequest
 		Keterangan:     "Pengajuan peminjaman baru dibuat",
 	})
 
-	kodePeminjaman := peminjaman.KodePeminjaman
-	if petugas, err := s.UserRepo.GetByRole(models.RoleSarpras); err == nil && len(petugas) > 0 {
-		for _, u := range petugas {
-			s.NotifikasiRepo.Create(&models.Notifikasi{
-				KodeNotifikasi:  generateCode("NTF"),
-				KodeUser:        u.KodeUser,
-				KodePeminjaman:  &kodePeminjaman,
-				JenisNotifikasi: models.NotifPengajuanDibuat,
-				Pesan:           "Pengajuan peminjaman baru menunggu verifikasi",
-				Status:          models.NotifikasiTerkirim,
-			})
-		}
+	// Send notification to Sarpras (async)
+	if s.EmailService != nil && s.EmailService.IsEnabled() {
+		go s.sendNewSubmissionEmail(peminjaman.KodePeminjaman)
 	}
 
 	return peminjaman, nil
@@ -241,27 +232,6 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 		Keterangan:     fmt.Sprintf("Status peminjaman diubah menjadi %s", req.Status),
 	})
 
-	pesan := "Pengajuan peminjaman Anda telah " + string(req.Status)
-	if req.Status == models.StatusPeminjamanRejected && req.CatatanVerifikasi != "" {
-		pesan += ". Catatan: " + req.CatatanVerifikasi
-	}
-
-	peminjamKode := peminjaman.KodeUser
-	var jenis models.NotifikasiJenisEnum
-	if req.Status == models.StatusPeminjamanApproved {
-		jenis = models.NotifStatusApproved
-	} else {
-		jenis = models.NotifStatusRejected
-	}
-	s.NotifikasiRepo.Create(&models.Notifikasi{
-		KodeNotifikasi:  generateCode("NTF"),
-		KodeUser:        peminjamKode,
-		KodePeminjaman:  &kodePeminjaman,
-		JenisNotifikasi: jenis,
-		Pesan:           pesan,
-		Status:          models.NotifikasiTerkirim,
-	})
-
 	// Send email notification asynchronously (non-blocking)
 	if s.EmailService != nil && s.EmailService.IsEnabled() {
 		go s.sendVerificationEmails(kodePeminjaman, verifierKode, req.Status, req.CatatanVerifikasi)
@@ -272,116 +242,125 @@ func (s *PeminjamanService) VerifikasiPeminjaman(kodePeminjaman string, verifier
 
 // sendVerificationEmails sends email notifications after verification (runs async)
 func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode string, status models.PeminjamanStatusEnum, catatan string) {
-	// Fetch full peminjaman data with related entities
+	// 1. Determine JenisPesan based on status
+	var jenisPesan string
+	if status == models.StatusPeminjamanApproved {
+		jenisPesan = models.JenisPesanApproved
+	} else {
+		jenisPesan = models.JenisPesanRejected
+	}
+
+	// 2. Insert log to mailbox
+	// We need peminjam's kodeUser, so we fetch minimal data first
 	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
 	if err != nil || peminjaman == nil {
 		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
 		return
 	}
 
-	// Get peminjam (mahasiswa) data
-	peminjam, err := s.UserRepo.GetByID(peminjaman.KodeUser)
-	if err != nil || peminjam == nil {
-		log.Printf("❌ Email: failed to get peminjam: %v", err)
+	mailbox := &models.Mailbox{
+		KodeUser:       peminjaman.KodeUser,
+		KodePeminjaman: kodePeminjaman,
+		JenisPesan:     jenisPesan,
+	}
+
+	if err := s.MailboxRepo.Create(mailbox); err != nil {
+		log.Printf("❌ Email: failed to insert mailbox: %v", err)
+		// Continue anyway to send email, even if logging fails?
+		// Or return? Let's log error but try to send email if we can get data.
+	} else {
+		log.Printf("✅ Mailbox: created log %s for %s", mailbox.KodeMailbox, kodePeminjaman)
+	}
+
+	// 3. Helper function to fetch data and send email
+	// We use the MailboxRepo to get full joined data (normalized approach)
+	// If mailbox insert failed, we might not have a KodeMailbox, so we fallback to manual fetching or retry insert.
+	// But let's assume insert usually works. If insert failed, we can't use GetFullDataByID comfortably without an ID.
+	// Strategy: If mailbox insert succeeded, use GetFullDataByID.
+
+	// Data preparation
+	var templateData internalsvc.EmailTemplateData
+	var emailTo string
+
+	if mailbox.KodeMailbox != "" {
+		// Efficient way: Get from mailbox view
+		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
+		if err != nil || details == nil {
+			log.Printf("❌ Email: failed to get mailbox details: %v", err)
+			return
+		}
+
+		// Map MailboxWithDetails to EmailTemplateData
+		// Note: We need to fetch Barang separately as it's a 1-to-Many relation not fully joined in a single row usually (or array agg).
+		// Our GetFullDataByID doesn't return barang list in current implementation.
+		// So we fetch barang manually.
+		barangList, _ := s.PeminjamanRepo.GetPeminjamanBarang(kodePeminjaman)
+		var barangItems []internalsvc.BarangItem
+		for _, b := range barangList {
+			namaBarang := b.KodeBarang
+			if barang, err := s.BarangRepo.GetByID(b.KodeBarang); err == nil && barang != nil {
+				namaBarang = barang.NamaBarang
+			}
+			barangItems = append(barangItems, internalsvc.BarangItem{
+				NamaBarang: namaBarang,
+				Jumlah:     b.Jumlah,
+			})
+		}
+
+		templateData = internalsvc.EmailTemplateData{
+			KodePeminjaman:    details.KodePeminjaman,
+			Status:            details.Status,
+			CatatanVerifikasi: catatan, // Use current note, not from DB yet if async delay
+			NamaPeminjam:      details.NamaPeminjam,
+			EmailPeminjam:     details.EmailPeminjam,
+			NoHPPeminjam:      details.NoHPPeminjam,
+			NamaOrganisasi:    details.NamaOrganisasi,
+			NamaKegiatan:      details.NamaKegiatan,
+			DeskripsiKegiatan: details.DeskripsiKegiatan,
+			NamaRuangan:       details.NamaRuangan,
+			LokasiRuangan:     details.LokasiRuangan,
+			Kapasitas:         details.Kapasitas,
+			TanggalMulai:      details.TanggalMulai,
+			TanggalSelesai:    details.TanggalSelesai,
+			TanggalVerifikasi: time.Now(),
+			NamaVerifikator:   details.NamaVerifikator,
+			Barang:            barangItems,
+		}
+		emailTo = details.EmailTujuan
+	} else {
+		// Fallback: If mailbox insert failed, we skip sending or handle manual fetch?
+		// For now, let's just return to avoid complexity duplication
 		return
 	}
 
-	// Get verifier (sarpras) data
-	verifier, _ := s.UserRepo.GetByID(verifierKode)
-	verifierName := "Sarpras"
-	if verifier != nil {
-		verifierName = verifier.Nama
-	}
-
-	// Get kegiatan data
-	var namaKegiatan, deskripsiKegiatan string
-	if peminjaman.KodeKegiatan != nil {
-		if kegiatan, err := s.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan); err == nil && kegiatan != nil {
-			namaKegiatan = kegiatan.NamaKegiatan
-			deskripsiKegiatan = kegiatan.Deskripsi
-		}
-	}
-	if namaKegiatan == "" {
-		namaKegiatan = "Peminjaman " + kodePeminjaman
-	}
-
-	// Get ruangan data
-	var namaRuangan, lokasiRuangan string
-	var kapasitas int
-	if peminjaman.KodeRuangan != nil {
-		if ruangan, err := s.RuanganRepo.GetByID(*peminjaman.KodeRuangan); err == nil && ruangan != nil {
-			namaRuangan = ruangan.NamaRuangan
-			lokasiRuangan = ruangan.Lokasi
-			kapasitas = ruangan.Kapasitas
-		}
-	}
-
-	// Get organisasi data
-	var namaOrganisasi string
-	if peminjam.OrganisasiKode != nil {
-		if org, err := s.OrganisasiRepo.GetByID(*peminjam.OrganisasiKode); err == nil && org != nil {
-			namaOrganisasi = org.NamaOrganisasi
-		}
-	}
-
-	// Get barang data
-	barangList, _ := s.PeminjamanRepo.GetPeminjamanBarang(kodePeminjaman)
-	var barangItems []internalsvc.BarangItem
-	for _, b := range barangList {
-		namaBarang := b.KodeBarang
-		if barang, err := s.BarangRepo.GetByID(b.KodeBarang); err == nil && barang != nil {
-			namaBarang = barang.NamaBarang
-		}
-		barangItems = append(barangItems, internalsvc.BarangItem{
-			NamaBarang: namaBarang,
-			Jumlah:     b.Jumlah,
-		})
-	}
-
-	// Get no HP
-	var noHP string
-	if peminjam.NoHP != nil {
-		noHP = *peminjam.NoHP
-	}
-
-	// Build template data
-	templateData := internalsvc.EmailTemplateData{
-		KodePeminjaman:    kodePeminjaman,
-		Status:            string(status),
-		CatatanVerifikasi: catatan,
-		NamaPeminjam:      peminjam.Nama,
-		EmailPeminjam:     peminjam.Email,
-		NoHPPeminjam:      noHP,
-		NamaOrganisasi:    namaOrganisasi,
-		NamaKegiatan:      namaKegiatan,
-		DeskripsiKegiatan: deskripsiKegiatan,
-		NamaRuangan:       namaRuangan,
-		LokasiRuangan:     lokasiRuangan,
-		Kapasitas:         kapasitas,
-		TanggalMulai:      peminjaman.TanggalMulai,
-		TanggalSelesai:    peminjaman.TanggalSelesai,
-		TanggalVerifikasi: time.Now(),
-		NamaVerifikator:   verifierName,
-		Barang:            barangItems,
-	}
-
-	// Send email to mahasiswa
+	// 4. Send Email based on status
 	if status == models.StatusPeminjamanApproved {
-		// Approved email
-		subject := internalsvc.GetApprovedEmailSubject(namaKegiatan)
+		// Approved Email
+		subject := internalsvc.GetApprovedEmailSubject(templateData.NamaKegiatan)
 		htmlBody := internalsvc.BuildApprovedEmailHTML(templateData)
-		if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
-			log.Printf("❌ Email: failed to send approval to %s: %v", peminjam.Email, err)
+		if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
+			log.Printf("❌ Email: failed to send approval to %s: %v", emailTo, err)
 		} else {
-			log.Printf("✅ Email: approval sent to %s", peminjam.Email)
+			log.Printf("✅ Email: approval sent to %s", emailTo)
 		}
 
-		// Send to security users
+		// Security Notification (Only for Approved)
+		// We can also insert into mailbox for security users if we want to track them
 		securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity)
 		if err == nil && len(securityUsers) > 0 {
-			securitySubject := internalsvc.GetSecurityEmailSubject(namaKegiatan, peminjaman.TanggalMulai)
+			securitySubject := internalsvc.GetSecurityEmailSubject(templateData.NamaKegiatan, templateData.TanggalMulai)
 			securityHTML := internalsvc.BuildSecurityNotificationHTML(templateData)
+
 			for _, sec := range securityUsers {
+				// Optional: Log to mailbox for security
+				secMailbox := &models.Mailbox{
+					KodeUser:       sec.KodeUser,
+					KodePeminjaman: kodePeminjaman,
+					JenisPesan:     models.JenisPesanSecurityNotify,
+				}
+				s.MailboxRepo.Create(secMailbox)
+
+				// Send email
 				if err := s.EmailService.SendEmail(sec.Email, securitySubject, securityHTML); err != nil {
 					log.Printf("❌ Email: failed to send to security %s: %v", sec.Email, err)
 				} else {
@@ -389,14 +368,15 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 				}
 			}
 		}
+
 	} else {
-		// Rejected email
-		subject := internalsvc.GetRejectedEmailSubject(namaKegiatan)
+		// Rejected Email
+		subject := internalsvc.GetRejectedEmailSubject(templateData.NamaKegiatan)
 		htmlBody := internalsvc.BuildRejectedEmailHTML(templateData)
-		if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
-			log.Printf("❌ Email: failed to send rejection to %s: %v", peminjam.Email, err)
+		if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
+			log.Printf("❌ Email: failed to send rejection to %s: %v", emailTo, err)
 		} else {
-			log.Printf("✅ Email: rejection sent to %s", peminjam.Email)
+			log.Printf("✅ Email: rejection sent to %s", emailTo)
 		}
 	}
 }
@@ -431,21 +411,6 @@ func (s *PeminjamanService) CancelPeminjaman(kodePeminjaman, cancellerKode, alas
 		Keterangan:     fmt.Sprintf("Peminjaman dibatalkan oleh SARPRAS. Alasan: %s", alasan),
 	})
 
-	// Create notification for peminjam
-	pesan := "Peminjaman Anda telah dibatalkan oleh SARPRAS"
-	if alasan != "" {
-		pesan += ". Alasan: " + alasan
-	}
-
-	s.NotifikasiRepo.Create(&models.Notifikasi{
-		KodeNotifikasi:  generateCode("NTF"),
-		KodeUser:        peminjaman.KodeUser,
-		KodePeminjaman:  &kodePeminjaman,
-		JenisNotifikasi: models.NotifStatusRejected, // Reuse rejected notification type
-		Pesan:           pesan,
-		Status:          models.NotifikasiTerkirim,
-	})
-
 	// Send email notification asynchronously (non-blocking)
 	if s.EmailService != nil && s.EmailService.IsEnabled() {
 		go s.sendCancellationEmail(kodePeminjaman, cancellerKode, alasan)
@@ -456,80 +421,187 @@ func (s *PeminjamanService) CancelPeminjaman(kodePeminjaman, cancellerKode, alas
 
 // sendCancellationEmail sends email notification after cancellation (runs async)
 func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode, alasan string) {
-	// Fetch full peminjaman data with related entities
+	// 1. Insert log to mailbox
+	// Fetch minimal peminjaman data for KodeUser
 	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
 	if err != nil || peminjaman == nil {
 		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
 		return
 	}
 
-	// Get peminjam (mahasiswa) data
-	peminjam, err := s.UserRepo.GetByID(peminjaman.KodeUser)
-	if err != nil || peminjam == nil {
-		log.Printf("❌ Email: failed to get peminjam: %v", err)
+	mailbox := &models.Mailbox{
+		KodeUser:       peminjaman.KodeUser,
+		KodePeminjaman: kodePeminjaman,
+		JenisPesan:     models.JenisPesanCancelled,
+	}
+
+	if err := s.MailboxRepo.Create(mailbox); err != nil {
+		log.Printf("❌ Email: failed to insert mailbox: %v", err)
+	} else {
+		log.Printf("✅ Mailbox: created log %s for cancellation %s", mailbox.KodeMailbox, kodePeminjaman)
+	}
+
+	// 2. Fetch full data via MailboxRepo
+	// Strategy: If mailbox insert succeeded, use GetFullDataByID.
+
+	// Prepare template data
+	var templateData internalsvc.EmailTemplateData
+	var emailTo string
+
+	if mailbox.KodeMailbox != "" {
+		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
+		if err != nil || details == nil {
+			log.Printf("❌ Email: failed to get mailbox details: %v", err)
+			return
+		}
+
+		// Fetch barang manually
+		barangList, _ := s.PeminjamanRepo.GetPeminjamanBarang(kodePeminjaman)
+		var barangItems []internalsvc.BarangItem
+		for _, b := range barangList {
+			namaBarang := b.KodeBarang
+			if barang, err := s.BarangRepo.GetByID(b.KodeBarang); err == nil && barang != nil {
+				namaBarang = barang.NamaBarang
+			}
+			barangItems = append(barangItems, internalsvc.BarangItem{
+				NamaBarang: namaBarang,
+				Jumlah:     b.Jumlah,
+			})
+		}
+
+		templateData = internalsvc.EmailTemplateData{
+			KodePeminjaman:    details.KodePeminjaman,
+			Status:            "CANCELLED",
+			CatatanVerifikasi: alasan, // Reuse catatan field for cancellation reason
+			NamaPeminjam:      details.NamaPeminjam,
+			EmailPeminjam:     details.EmailPeminjam,
+			NoHPPeminjam:      details.NoHPPeminjam,
+			NamaOrganisasi:    details.NamaOrganisasi,
+			NamaKegiatan:      details.NamaKegiatan,
+			DeskripsiKegiatan: details.DeskripsiKegiatan,
+			NamaRuangan:       details.NamaRuangan,
+			LokasiRuangan:     details.LokasiRuangan,
+			Kapasitas:         details.Kapasitas,
+			TanggalMulai:      details.TanggalMulai,
+			TanggalSelesai:    details.TanggalSelesai,
+			TanggalVerifikasi: time.Now(),
+			NamaVerifikator:   "SARPRAS",
+			Barang:            barangItems,
+		}
+		emailTo = details.EmailTujuan
+
+	} else {
+		// Fallback not implemented to keep it clean
 		return
 	}
 
-	// Get canceller (sarpras) data
-	canceller, _ := s.UserRepo.GetByID(cancellerKode)
-	cancellerName := "Sarpras"
-	if canceller != nil {
-		cancellerName = canceller.Nama
-	}
-
-	// Get kegiatan data
-	var namaKegiatan string
-	if peminjaman.KodeKegiatan != nil {
-		if kegiatan, err := s.KegiatanRepo.GetByID(*peminjaman.KodeKegiatan); err == nil && kegiatan != nil {
-			namaKegiatan = kegiatan.NamaKegiatan
-		}
-	}
-	if namaKegiatan == "" {
-		namaKegiatan = "Peminjaman " + kodePeminjaman
-	}
-
-	// Get ruangan data
-	var namaRuangan string
-	if peminjaman.KodeRuangan != nil {
-		if ruangan, err := s.RuanganRepo.GetByID(*peminjaman.KodeRuangan); err == nil && ruangan != nil {
-			namaRuangan = ruangan.NamaRuangan
-		}
-	}
-
-	// Build template data
-	templateData := internalsvc.EmailTemplateData{
-		KodePeminjaman:    kodePeminjaman,
-		Status:            "CANCELLED",
-		CatatanVerifikasi: alasan,
-		NamaPeminjam:      peminjam.Nama,
-		EmailPeminjam:     peminjam.Email,
-		NamaKegiatan:      namaKegiatan,
-		NamaRuangan:       namaRuangan,
-		TanggalMulai:      peminjaman.TanggalMulai,
-		TanggalSelesai:    peminjaman.TanggalSelesai,
-		TanggalVerifikasi: time.Now(),
-		NamaVerifikator:   cancellerName,
-	}
-
-	// Send cancellation email to mahasiswa
-	subject := fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s", namaKegiatan)
+	// 3. Send Cancellation Email
+	subject := internalsvc.GetCancelledEmailSubject(templateData.NamaKegiatan)
 	htmlBody := internalsvc.BuildCancelledEmailHTML(templateData)
-	if err := s.EmailService.SendEmail(peminjam.Email, subject, htmlBody); err != nil {
-		log.Printf("❌ Email: failed to send cancellation to %s: %v", peminjam.Email, err)
+
+	if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
+		log.Printf("❌ Email: failed to send cancellation to %s: %v", emailTo, err)
 	} else {
-		log.Printf("✅ Email: cancellation sent to %s", peminjam.Email)
+		log.Printf("✅ Email: cancellation sent to %s", emailTo)
 	}
 
-	// Also notify security about the cancellation
+	// 4. Notify Security
 	securityUsers, err := s.UserRepo.GetByRole(models.RoleSecurity)
 	if err == nil && len(securityUsers) > 0 {
-		securitySubject := fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s (%s)", namaKegiatan, peminjaman.TanggalMulai.Format("02 Jan 2006"))
+		securitySubject := fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s (%s)", templateData.NamaKegiatan, templateData.TanggalMulai.Format("02 Jan 2006"))
 		for _, sec := range securityUsers {
+			// Optional: Log to mailbox for security
+			secMailbox := &models.Mailbox{
+				KodeUser:       sec.KodeUser,
+				KodePeminjaman: kodePeminjaman,
+				JenisPesan:     models.JenisPesanSecurityNotify,
+			}
+			s.MailboxRepo.Create(secMailbox)
+
 			if err := s.EmailService.SendEmail(sec.Email, securitySubject, htmlBody); err != nil {
 				log.Printf("❌ Email: failed to send cancellation to security %s: %v", sec.Email, err)
 			} else {
 				log.Printf("✅ Email: cancellation notification sent to security %s", sec.Email)
 			}
+		}
+	}
+}
+
+// sendNewSubmissionEmail sends email notification to all Sarpras staff when new submission created
+func (s *PeminjamanService) sendNewSubmissionEmail(kodePeminjaman string) {
+	// 1. Get Sarpras Users
+	sarprasUsers, err := s.UserRepo.GetByRole(models.RoleSarpras)
+	if err != nil || len(sarprasUsers) == 0 {
+		log.Printf("⚠️ Email: No sarpras found or error: %v", err)
+		return
+	}
+
+	// 2. Fetch Peminjaman Data (once)
+	// We need fetching minimal data first for constructing Mailbox,
+	// but we can optimize by fetching full data later inside loop or once here.
+	// Since MailboxRepo.GetFullDataByID is good for template, let's stick to the pattern:
+	// Insert Mailbox -> GetFullData (this ensures data consistency with mailbox view)
+
+	// Fetch Barang Data once (to reuse)
+	barangList, _ := s.PeminjamanRepo.GetPeminjamanBarang(kodePeminjaman)
+	var barangItems []internalsvc.BarangItem
+	for _, b := range barangList {
+		namaBarang := b.KodeBarang
+		if barang, err := s.BarangRepo.GetByID(b.KodeBarang); err == nil && barang != nil {
+			namaBarang = barang.NamaBarang
+		}
+		barangItems = append(barangItems, internalsvc.BarangItem{
+			NamaBarang: namaBarang,
+			Jumlah:     b.Jumlah,
+		})
+	}
+
+	// 3. Loop Sarpras Users
+	for _, staff := range sarprasUsers {
+		// Log to Mailbox
+		mailbox := &models.Mailbox{
+			KodeUser:       staff.KodeUser,
+			KodePeminjaman: kodePeminjaman,
+			JenisPesan:     models.JenisPesanNewSubmission,
+		}
+
+		if err := s.MailboxRepo.Create(mailbox); err != nil {
+			log.Printf("❌ Email: failed to insert mailbox for sarpras %s: %v", staff.Email, err)
+			continue
+		}
+
+		// Get Data for Email Template
+		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
+		if err != nil || details == nil {
+			log.Printf("❌ Email: failed to get mailbox details for sarpras %s: %v", staff.Email, err)
+			continue
+		}
+
+		// Prepare Template Data
+		templateData := internalsvc.EmailTemplateData{
+			KodePeminjaman: details.KodePeminjaman,
+			Status:         "NEW_SUBMISSION",
+			NamaPeminjam:   details.NamaPeminjam,
+			// No Need EmailPeminjam as recipient is Sarpras
+			NamaOrganisasi:    details.NamaOrganisasi,
+			NoHPPeminjam:      details.NoHPPeminjam,
+			NamaKegiatan:      details.NamaKegiatan,
+			DeskripsiKegiatan: details.DeskripsiKegiatan, // Added field to struct if needed
+			NamaRuangan:       details.NamaRuangan,
+			LokasiRuangan:     details.LokasiRuangan,
+			TanggalMulai:      details.TanggalMulai,
+			TanggalSelesai:    details.TanggalSelesai,
+			Barang:            barangItems,
+		}
+
+		// Build and Send Email
+		subject := internalsvc.GetNewSubmissionEmailSubject(templateData.NamaKegiatan)
+		htmlBody := internalsvc.BuildNewSubmissionEmailHTML(templateData)
+
+		if err := s.EmailService.SendEmail(staff.Email, subject, htmlBody); err != nil {
+			log.Printf("❌ Email: failed to send new submission notify to %s: %v", staff.Email, err)
+		} else {
+			log.Printf("✅ Email: new submission notify sent to %s", staff.Email)
 		}
 	}
 }

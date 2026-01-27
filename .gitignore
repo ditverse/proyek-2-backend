@@ -1,3 +1,4 @@
 .env
 tmp/
 *.exe
+*gmail_token.json

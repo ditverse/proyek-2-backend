@@ -389,22 +389,22 @@ func buildBarangListHTML(barang []BarangItem) string {
 
 // GetApprovedEmailSubject returns subject for approved email
 func GetApprovedEmailSubject(namaKegiatan string) string {
-	return fmt.Sprintf("✅ Peminjaman Fasilitas Disetujui - %s", namaKegiatan)
+	return fmt.Sprintf("Peminjaman Fasilitas Disetujui - %s", namaKegiatan)
 }
 
 // GetRejectedEmailSubject returns subject for rejected email
 func GetRejectedEmailSubject(namaKegiatan string) string {
-	return fmt.Sprintf("❌ Peminjaman Fasilitas Ditolak - %s", namaKegiatan)
+	return fmt.Sprintf("Peminjaman Fasilitas Ditolak - %s", namaKegiatan)
 }
 
 // GetSecurityEmailSubject returns subject for security notification
 func GetSecurityEmailSubject(namaKegiatan string, tanggal time.Time) string {
-	return fmt.Sprintf("🔔 Jadwal Kegiatan: %s - %s", namaKegiatan, FormatDateShort(tanggal))
+	return fmt.Sprintf("Jadwal Kegiatan: %s - %s", namaKegiatan, FormatDateShort(tanggal))
 }
 
 // GetCancelledEmailSubject returns subject for cancelled email
 func GetCancelledEmailSubject(namaKegiatan string) string {
-	return fmt.Sprintf("⚠️ Peminjaman Dibatalkan: %s", namaKegiatan)
+	return fmt.Sprintf("Peminjaman Dibatalkan: %s", namaKegiatan)
 }
 
 // BuildCancelledEmailHTML builds HTML email for cancelled loan
@@ -499,7 +499,7 @@ func BuildCancelledEmailHTML(data EmailTemplateData) string {
 
 // GetNewSubmissionEmailSubject returns subject for new submission email
 func GetNewSubmissionEmailSubject(namaKegiatan string) string {
-	return fmt.Sprintf("📝 Pengajuan Peminjaman Baru: %s", namaKegiatan)
+	return fmt.Sprintf("Pengajuan Peminjaman Baru: %s", namaKegiatan)
 }
 
 // BuildNewSubmissionEmailHTML builds HTML email for Sarpras notification

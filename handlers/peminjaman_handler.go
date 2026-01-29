@@ -106,6 +106,11 @@ func (h *PeminjamanHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	user, _ := h.UserRepo.GetByID(peminjaman.KodeUser)
 	if user != nil {
 		user.PasswordHash = ""
+		// Load organisasi data jika user memiliki organisasi_kode
+		if user.OrganisasiKode != nil {
+			organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
+			user.Organisasi = organisasi
+		}
 		peminjaman.Peminjam = user
 	}
 	items, _ := h.PeminjamanRepo.GetPeminjamanBarang(peminjaman.KodePeminjaman)
@@ -442,6 +447,11 @@ func (h *PeminjamanHandler) GetJadwalAktif(w http.ResponseWriter, r *http.Reques
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
 			user.PasswordHash = ""
+			// Load organisasi data
+			if user.OrganisasiKode != nil {
+				organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
+				user.Organisasi = organisasi
+			}
 			peminjaman[i].Peminjam = user
 		}
 	}
@@ -501,6 +511,11 @@ func (h *PeminjamanHandler) GetJadwalAktifBelumVerifikasi(w http.ResponseWriter,
 		user, _ := h.UserRepo.GetByID(peminjaman[i].KodeUser)
 		if user != nil {
 			user.PasswordHash = ""
+			// Load organisasi data
+			if user.OrganisasiKode != nil {
+				organisasi, _ := h.OrganisasiRepo.GetByID(*user.OrganisasiKode)
+				user.Organisasi = organisasi
+			}
 			peminjaman[i].Peminjam = user
 		}
 	}

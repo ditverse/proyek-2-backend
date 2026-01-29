@@ -102,8 +102,17 @@ func New(db *sql.DB, cfg *config.Config) http.Handler {
 	})
 	// Public info umum endpoint
 	mux.HandleFunc("/api/info", infoHandler)
-	// Public organisasi endpoint - for registration dropdown
-	mux.HandleFunc("/api/organisasi", organisasiHandler.GetAll)
+	// Public organisasi endpoint - for registration dropdown and new org registration
+	mux.HandleFunc("/api/organisasi", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			organisasiHandler.GetAll(w, r)
+		case http.MethodPost:
+			organisasiHandler.Create(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Protected routes - Ruangan
 	mux.Handle("/api/ruangan", corsMiddleware(http.HandlerFunc(ruanganHandler.GetAll)))

@@ -58,17 +58,17 @@ func (s *StatusScheduler) updateStatuses() {
 	// 1. Update APPROVED/ONGOING → FINISHED (where tanggal_selesai < now)
 	finishedCount, err := s.peminjamanRepo.UpdateStatusToFinished(now)
 	if err != nil {
-		log.Printf("❌ Error updating status to FINISHED: %v", err)
+		log.Printf("[ERROR] Error updating status to FINISHED: %v", err)
 	} else if finishedCount > 0 {
-		log.Printf("✅ Updated %d peminjaman to FINISHED", finishedCount)
+		log.Printf("[OK] Updated %d peminjaman to FINISHED", finishedCount)
 	}
 
 	// 2. Update APPROVED → ONGOING (where tanggal_mulai <= now <= tanggal_selesai)
 	ongoingCount, err := s.peminjamanRepo.UpdateStatusToOngoing(now)
 	if err != nil {
-		log.Printf("❌ Error updating status to ONGOING: %v", err)
+		log.Printf("[ERROR] Error updating status to ONGOING: %v", err)
 	} else if ongoingCount > 0 {
-		log.Printf("✅ Updated %d peminjaman to ONGOING", ongoingCount)
+		log.Printf("[OK] Updated %d peminjaman to ONGOING", ongoingCount)
 	}
 }
 

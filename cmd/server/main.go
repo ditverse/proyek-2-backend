@@ -52,7 +52,7 @@ func main() {
 	log.Printf("Server running on http://localhost:%s", cfg.Port)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("❌ Server error: %v", err)
+			log.Fatalf("Server error: %v", err)
 		}
 	}()
 
@@ -61,13 +61,13 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("\n⏱️  Shutting down server...")
+	log.Println("\nShutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("❌ Server shutdown error: %v", err)
+		log.Fatalf("Server shutdown error: %v", err)
 	}
 
-	log.Println("✅ Server shutdown complete")
+	log.Println("Server shutdown complete")
 }

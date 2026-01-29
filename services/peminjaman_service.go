@@ -254,7 +254,7 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 	// We need peminjam's kodeUser, so we fetch minimal data first
 	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
 	if err != nil || peminjaman == nil {
-		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
+		log.Printf("[ERROR] Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
 		return
 	}
 
@@ -265,11 +265,11 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 	}
 
 	if err := s.MailboxRepo.Create(mailbox); err != nil {
-		log.Printf("❌ Email: failed to insert mailbox: %v", err)
+		log.Printf("[ERROR] Email: failed to insert mailbox: %v", err)
 		// Continue anyway to send email, even if logging fails?
 		// Or return? Let's log error but try to send email if we can get data.
 	} else {
-		log.Printf("✅ Mailbox: created log %s for %s", mailbox.KodeMailbox, kodePeminjaman)
+		log.Printf("[OK] Mailbox: created log %s for %s", mailbox.KodeMailbox, kodePeminjaman)
 	}
 
 	// 3. Helper function to fetch data and send email
@@ -286,7 +286,7 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 		// Efficient way: Get from mailbox view
 		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
 		if err != nil || details == nil {
-			log.Printf("❌ Email: failed to get mailbox details: %v", err)
+			log.Printf("[ERROR] Email: failed to get mailbox details: %v", err)
 			return
 		}
 
@@ -339,9 +339,9 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 		subject := internalsvc.GetApprovedEmailSubject(templateData.NamaKegiatan)
 		htmlBody := internalsvc.BuildApprovedEmailHTML(templateData)
 		if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
-			log.Printf("❌ Email: failed to send approval to %s: %v", emailTo, err)
+			log.Printf("[ERROR] Email: failed to send approval to %s: %v", emailTo, err)
 		} else {
-			log.Printf("✅ Email: approval sent to %s", emailTo)
+			log.Printf("[OK] Email: approval sent to %s", emailTo)
 		}
 
 		// Security Notification (Only for Approved)
@@ -362,9 +362,9 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 
 				// Send email
 				if err := s.EmailService.SendEmail(sec.Email, securitySubject, securityHTML); err != nil {
-					log.Printf("❌ Email: failed to send to security %s: %v", sec.Email, err)
+					log.Printf("[ERROR] Email: failed to send to security %s: %v", sec.Email, err)
 				} else {
-					log.Printf("✅ Email: security notification sent to %s", sec.Email)
+					log.Printf("[OK] Email: security notification sent to %s", sec.Email)
 				}
 			}
 		}
@@ -374,9 +374,9 @@ func (s *PeminjamanService) sendVerificationEmails(kodePeminjaman, verifierKode 
 		subject := internalsvc.GetRejectedEmailSubject(templateData.NamaKegiatan)
 		htmlBody := internalsvc.BuildRejectedEmailHTML(templateData)
 		if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
-			log.Printf("❌ Email: failed to send rejection to %s: %v", emailTo, err)
+			log.Printf("[ERROR] Email: failed to send rejection to %s: %v", emailTo, err)
 		} else {
-			log.Printf("✅ Email: rejection sent to %s", emailTo)
+			log.Printf("[OK] Email: rejection sent to %s", emailTo)
 		}
 	}
 }
@@ -425,7 +425,7 @@ func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode,
 	// Fetch minimal peminjaman data for KodeUser
 	peminjaman, err := s.PeminjamanRepo.GetByID(kodePeminjaman)
 	if err != nil || peminjaman == nil {
-		log.Printf("❌ Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
+		log.Printf("[ERROR] Email: failed to get peminjaman %s: %v", kodePeminjaman, err)
 		return
 	}
 
@@ -436,9 +436,9 @@ func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode,
 	}
 
 	if err := s.MailboxRepo.Create(mailbox); err != nil {
-		log.Printf("❌ Email: failed to insert mailbox: %v", err)
+		log.Printf("[ERROR] Email: failed to insert mailbox: %v", err)
 	} else {
-		log.Printf("✅ Mailbox: created log %s for cancellation %s", mailbox.KodeMailbox, kodePeminjaman)
+		log.Printf("[OK] Mailbox: created log %s for cancellation %s", mailbox.KodeMailbox, kodePeminjaman)
 	}
 
 	// 2. Fetch full data via MailboxRepo
@@ -451,7 +451,7 @@ func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode,
 	if mailbox.KodeMailbox != "" {
 		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
 		if err != nil || details == nil {
-			log.Printf("❌ Email: failed to get mailbox details: %v", err)
+			log.Printf("[ERROR] Email: failed to get mailbox details: %v", err)
 			return
 		}
 
@@ -500,9 +500,9 @@ func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode,
 	htmlBody := internalsvc.BuildCancelledEmailHTML(templateData)
 
 	if err := s.EmailService.SendEmail(emailTo, subject, htmlBody); err != nil {
-		log.Printf("❌ Email: failed to send cancellation to %s: %v", emailTo, err)
+		log.Printf("[ERROR] Email: failed to send cancellation to %s: %v", emailTo, err)
 	} else {
-		log.Printf("✅ Email: cancellation sent to %s", emailTo)
+		log.Printf("[OK] Email: cancellation sent to %s", emailTo)
 	}
 
 	// 4. Notify Security
@@ -519,9 +519,9 @@ func (s *PeminjamanService) sendCancellationEmail(kodePeminjaman, cancellerKode,
 			s.MailboxRepo.Create(secMailbox)
 
 			if err := s.EmailService.SendEmail(sec.Email, securitySubject, htmlBody); err != nil {
-				log.Printf("❌ Email: failed to send cancellation to security %s: %v", sec.Email, err)
+				log.Printf("[ERROR] Email: failed to send cancellation to security %s: %v", sec.Email, err)
 			} else {
-				log.Printf("✅ Email: cancellation notification sent to security %s", sec.Email)
+				log.Printf("[OK] Email: cancellation notification sent to security %s", sec.Email)
 			}
 		}
 	}
@@ -566,14 +566,14 @@ func (s *PeminjamanService) sendNewSubmissionEmail(kodePeminjaman string) {
 		}
 
 		if err := s.MailboxRepo.Create(mailbox); err != nil {
-			log.Printf("❌ Email: failed to insert mailbox for sarpras %s: %v", staff.Email, err)
+			log.Printf("[ERROR] Email: failed to insert mailbox for sarpras %s: %v", staff.Email, err)
 			continue
 		}
 
 		// Get Data for Email Template
 		details, err := s.MailboxRepo.GetFullDataByID(mailbox.KodeMailbox)
 		if err != nil || details == nil {
-			log.Printf("❌ Email: failed to get mailbox details for sarpras %s: %v", staff.Email, err)
+			log.Printf("[ERROR] Email: failed to get mailbox details for sarpras %s: %v", staff.Email, err)
 			continue
 		}
 
@@ -599,9 +599,9 @@ func (s *PeminjamanService) sendNewSubmissionEmail(kodePeminjaman string) {
 		htmlBody := internalsvc.BuildNewSubmissionEmailHTML(templateData)
 
 		if err := s.EmailService.SendEmail(staff.Email, subject, htmlBody); err != nil {
-			log.Printf("❌ Email: failed to send new submission notify to %s: %v", staff.Email, err)
+			log.Printf("[ERROR] Email: failed to send new submission notify to %s: %v", staff.Email, err)
 		} else {
-			log.Printf("✅ Email: new submission notify sent to %s", staff.Email)
+			log.Printf("[OK] Email: new submission notify sent to %s", staff.Email)
 		}
 	}
 }

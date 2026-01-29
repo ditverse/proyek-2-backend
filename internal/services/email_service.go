@@ -52,11 +52,11 @@ func NewEmailService() *EmailService {
 	// Create Gmail service
 	gmailSvc, err := gmail.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		log.Printf("❌ Failed to create Gmail service: %v", err)
+		log.Printf("[ERROR] Failed to create Gmail service: %v", err)
 		return &EmailService{enabled: false}
 	}
 
-	log.Println("✅ Email service initialized successfully")
+	log.Println("[OK] Email service initialized successfully")
 	return &EmailService{
 		gmailService: gmailSvc,
 		senderEmail:  cfg.SenderEmail,
@@ -99,7 +99,7 @@ func (s *EmailService) SendEmail(to, subject, htmlBody string) error {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Printf("📧 Email sent successfully to: %s", to)
+	log.Printf("[Email] Sent successfully to: %s", to)
 	return nil
 }
 

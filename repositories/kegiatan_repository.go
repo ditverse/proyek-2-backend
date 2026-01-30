@@ -14,9 +14,11 @@ func NewKegiatanRepository(db *sql.DB) *KegiatanRepository {
 }
 
 func (r *KegiatanRepository) Create(k *models.Kegiatan) error {
-	query := `INSERT INTO kegiatan (kode_kegiatan, nama_kegiatan, deskripsi, tanggal_mulai, tanggal_selesai, organisasi_kode) 
-			  VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`
-	return r.DB.QueryRow(query, k.KodeKegiatan, k.NamaKegiatan, k.Deskripsi, k.TanggalMulai, k.TanggalSelesai, k.OrganisasiKode).Scan(&k.CreatedAt)
+	// Let database trigger generate kode_kegiatan to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_kegiatan) generates unique sequential codes per day
+	query := `INSERT INTO kegiatan (nama_kegiatan, deskripsi, tanggal_mulai, tanggal_selesai, organisasi_kode) 
+			  VALUES ($1, $2, $3, $4, $5) RETURNING kode_kegiatan, created_at`
+	return r.DB.QueryRow(query, k.NamaKegiatan, k.Deskripsi, k.TanggalMulai, k.TanggalSelesai, k.OrganisasiKode).Scan(&k.KodeKegiatan, &k.CreatedAt)
 }
 
 func (r *KegiatanRepository) GetByID(kode string) (*models.Kegiatan, error) {

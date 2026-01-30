@@ -14,10 +14,12 @@ func NewKehadiranRepository(db *sql.DB) *KehadiranRepository {
 }
 
 func (r *KehadiranRepository) Create(kehadiran *models.KehadiranPeminjam) error {
+	// Let database trigger generate kode_kehadiran to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_kehadiran) generates unique sequential codes per day
 	query := `
-		INSERT INTO kehadiran_peminjam (kode_kehadiran, kode_peminjaman, status_kehadiran, keterangan, diverifikasi_oleh)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING waktu_konfirmasi, created_at, updated_at
+		INSERT INTO kehadiran_peminjam (kode_peminjaman, status_kehadiran, keterangan, diverifikasi_oleh)
+		VALUES ($1, $2, $3, $4)
+		RETURNING kode_kehadiran, waktu_konfirmasi, created_at, updated_at
 	`
 	var verifier interface{}
 	if kehadiran.DiverifikasiOleh != nil {
@@ -25,12 +27,11 @@ func (r *KehadiranRepository) Create(kehadiran *models.KehadiranPeminjam) error 
 	}
 	return r.DB.QueryRow(
 		query,
-		kehadiran.KodeKehadiran,
 		kehadiran.KodePeminjaman,
 		kehadiran.StatusKehadiran,
 		kehadiran.Keterangan,
 		verifier,
-	).Scan(&kehadiran.WaktuKonfirmasi, &kehadiran.CreatedAt, &kehadiran.UpdatedAt)
+	).Scan(&kehadiran.KodeKehadiran, &kehadiran.WaktuKonfirmasi, &kehadiran.CreatedAt, &kehadiran.UpdatedAt)
 }
 
 func (r *KehadiranRepository) GetByPeminjamanID(kodePeminjaman string) (*models.KehadiranPeminjam, error) {
@@ -100,7 +101,6 @@ func (r *KehadiranRepository) GetAll(start, end string) ([]models.KehadiranPemin
 	return kehadiran, nil
 }
 
-
 // GetRiwayat returns all kehadiran records with optional date filtering
 func (r *KehadiranRepository) GetRiwayat(start, end *string) ([]models.KehadiranPeminjam, error) {
 	query := `
@@ -109,15 +109,15 @@ func (r *KehadiranRepository) GetRiwayat(start, end *string) ([]models.Kehadiran
 		FROM kehadiran_peminjam
 	`
 	args := []interface{}{}
-	
+
 	// Add date filter if both start and end provided
 	if start != nil && end != nil && *start != "" && *end != "" {
 		query += ` WHERE waktu_konfirmasi BETWEEN $1 AND $2`
 		args = append(args, *start, *end)
 	}
-	
+
 	query += ` ORDER BY waktu_konfirmasi DESC`
-	
+
 	rows, err := r.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -146,11 +146,10 @@ func (r *KehadiranRepository) GetRiwayat(start, end *string) ([]models.Kehadiran
 		}
 		kehadiranList = append(kehadiranList, k)
 	}
-	
+
 	if kehadiranList == nil {
 		kehadiranList = []models.KehadiranPeminjam{}
 	}
-	
+
 	return kehadiranList, nil
 }
-

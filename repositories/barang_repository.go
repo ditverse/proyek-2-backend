@@ -72,23 +72,24 @@ func (r *BarangRepository) GetByID(kodeBarang string) (*models.Barang, error) {
 }
 
 func (r *BarangRepository) Create(barang *models.Barang) error {
+	// Let database trigger generate kode_barang to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_barang) generates unique sequential codes
 	query := `
-		INSERT INTO barang (kode_barang, nama_barang, deskripsi, jumlah_total, ruangan_kode)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO barang (nama_barang, deskripsi, jumlah_total, ruangan_kode)
+		VALUES ($1, $2, $3, $4)
+		RETURNING kode_barang
 	`
 	var ruangan interface{}
 	if barang.RuanganKode != nil {
 		ruangan = *barang.RuanganKode
 	}
-	_, err := r.DB.Exec(
+	return r.DB.QueryRow(
 		query,
-		barang.KodeBarang,
 		barang.NamaBarang,
 		barang.Deskripsi,
 		barang.JumlahTotal,
 		ruangan,
-	)
-	return err
+	).Scan(&barang.KodeBarang)
 }
 
 func (r *BarangRepository) Update(barang *models.Barang) error {

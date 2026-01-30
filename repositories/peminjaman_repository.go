@@ -45,12 +45,14 @@ func (r *PeminjamanRepository) Create(peminjaman *models.Peminjaman) error {
 	).Scan(&peminjaman.KodePeminjaman, &peminjaman.CreatedAt)
 }
 
-func (r *PeminjamanRepository) CreatePeminjamanBarang(kodePeminjamanBarang, kodePeminjaman, kodeBarang string, jumlah int) error {
+func (r *PeminjamanRepository) CreatePeminjamanBarang(kodePeminjaman, kodeBarang string, jumlah int) error {
+	// Let database trigger generate kode_peminjaman_barang to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_peminjaman_barang) generates unique sequential codes per day
 	query := `
-		INSERT INTO peminjaman_barang (kode_peminjaman_barang, kode_peminjaman, kode_barang, jumlah)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO peminjaman_barang (kode_peminjaman, kode_barang, jumlah)
+		VALUES ($1, $2, $3)
 	`
-	_, err := r.DB.Exec(query, kodePeminjamanBarang, kodePeminjaman, kodeBarang, jumlah)
+	_, err := r.DB.Exec(query, kodePeminjaman, kodeBarang, jumlah)
 	return err
 }
 

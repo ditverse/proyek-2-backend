@@ -14,10 +14,12 @@ func NewLogAktivitasRepository(db *sql.DB) *LogAktivitasRepository {
 }
 
 func (r *LogAktivitasRepository) Create(log *models.LogAktivitas) error {
+	// Let database trigger generate kode_log to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_log) generates unique sequential codes per day
 	query := `
-		INSERT INTO log_aktivitas (kode_log, kode_user, kode_peminjaman, aksi, keterangan)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING waktu, updated_at
+		INSERT INTO log_aktivitas (kode_user, kode_peminjaman, aksi, keterangan)
+		VALUES ($1, $2, $3, $4)
+		RETURNING kode_log, waktu, updated_at
 	`
 	var kodeUser interface{}
 	if log.KodeUser != nil {
@@ -29,12 +31,11 @@ func (r *LogAktivitasRepository) Create(log *models.LogAktivitas) error {
 	}
 	err := r.DB.QueryRow(
 		query,
-		log.KodeLog,
 		kodeUser,
 		kodePeminjaman,
 		log.Aksi,
 		log.Keterangan,
-	).Scan(&log.Waktu, &log.UpdatedAt)
+	).Scan(&log.KodeLog, &log.Waktu, &log.UpdatedAt)
 	return err
 }
 
@@ -63,10 +64,10 @@ func (r *LogAktivitasRepository) GetAll(filter string) ([]models.LogAktivitas, e
 	var logs []models.LogAktivitas
 	for rows.Next() {
 		var (
-			log models.LogAktivitas
-			kodeUser sql.NullString
+			log            models.LogAktivitas
+			kodeUser       sql.NullString
 			kodePeminjaman sql.NullString
-			updatedAt sql.NullTime
+			updatedAt      sql.NullTime
 		)
 		err := rows.Scan(
 			&log.KodeLog,
@@ -94,4 +95,3 @@ func (r *LogAktivitasRepository) GetAll(filter string) ([]models.LogAktivitas, e
 	}
 	return logs, nil
 }
-

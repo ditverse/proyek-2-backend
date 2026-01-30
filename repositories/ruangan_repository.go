@@ -56,19 +56,20 @@ func (r *RuanganRepository) GetByID(kodeRuangan string) (*models.Ruangan, error)
 }
 
 func (r *RuanganRepository) Create(ruangan *models.Ruangan) error {
+	// Let database trigger generate kode_ruangan to avoid duplicate key errors
+	// The trigger (trigger_generate_kode_ruangan) generates unique sequential codes
 	query := `
-		INSERT INTO ruangan (kode_ruangan, nama_ruangan, lokasi, kapasitas, deskripsi)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO ruangan (nama_ruangan, lokasi, kapasitas, deskripsi)
+		VALUES ($1, $2, $3, $4)
+		RETURNING kode_ruangan
 	`
-	_, err := r.DB.Exec(
+	return r.DB.QueryRow(
 		query,
-		ruangan.KodeRuangan,
 		ruangan.NamaRuangan,
 		ruangan.Lokasi,
 		ruangan.Kapasitas,
 		ruangan.Deskripsi,
-	)
-	return err
+	).Scan(&ruangan.KodeRuangan)
 }
 
 func (r *RuanganRepository) Update(ruangan *models.Ruangan) error {
@@ -86,4 +87,3 @@ func (r *RuanganRepository) Delete(kodeRuangan string) error {
 	_, err := r.DB.Exec(query, kodeRuangan)
 	return err
 }
-

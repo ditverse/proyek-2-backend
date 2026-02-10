@@ -52,23 +52,18 @@ func (s *StatusScheduler) Stop() {
 }
 
 // updateStatuses performs the status transition logic
+// Note: APPROVED → ONGOING transition is now handled by security verification in kehadiran_service
+// This scheduler only handles automatic FINISHED transitions
 func (s *StatusScheduler) updateStatuses() {
 	now := time.Now()
 
-	// 1. Update APPROVED/ONGOING → FINISHED (where tanggal_selesai < now)
+	// Update APPROVED/ONGOING → FINISHED (where tanggal_selesai < now)
+	// This ensures peminjaman gets FINISHED even if security hasn't verified attendance
 	finishedCount, err := s.peminjamanRepo.UpdateStatusToFinished(now)
 	if err != nil {
 		log.Printf("[ERROR] Error updating status to FINISHED: %v", err)
 	} else if finishedCount > 0 {
 		log.Printf("[OK] Updated %d peminjaman to FINISHED", finishedCount)
-	}
-
-	// 2. Update APPROVED → ONGOING (where tanggal_mulai <= now <= tanggal_selesai)
-	ongoingCount, err := s.peminjamanRepo.UpdateStatusToOngoing(now)
-	if err != nil {
-		log.Printf("[ERROR] Error updating status to ONGOING: %v", err)
-	} else if ongoingCount > 0 {
-		log.Printf("[OK] Updated %d peminjaman to ONGOING", ongoingCount)
 	}
 }
 
